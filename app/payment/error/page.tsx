@@ -7,6 +7,9 @@ import Link from 'next/link';
 import { Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
 
+// Evitar prerender y el error de CSR bailout en Vercel
+export const dynamic = 'force-dynamic';
+
 function ErrorContent() {
   const searchParams = useSearchParams();
   const reason = searchParams.get('reason') || 'Error en el procesamiento del pago';

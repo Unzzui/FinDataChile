@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { Suspense, useEffect, useState } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
 import { CheckCircle, XCircle, Loader2 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -9,7 +9,9 @@ import { useToast } from '@/hooks/use-toast';
 
 type PaymentStatus = 'processing' | 'success' | 'error' | 'cancelled';
 
-export default function PaymentReturnPage() {
+export const dynamic = 'force-dynamic';
+
+function ReturnContent() {
   const searchParams = useSearchParams();
   const router = useRouter();
   const { toast } = useToast();
@@ -276,4 +278,12 @@ export default function PaymentReturnPage() {
       </Card>
     </div>
   );
-} 
+}
+
+export default function PaymentReturnPage() {
+  return (
+    <Suspense fallback={null}>
+      <ReturnContent />
+    </Suspense>
+  );
+}

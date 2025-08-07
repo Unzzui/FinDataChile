@@ -1,11 +1,13 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { Suspense, useEffect, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Loader2 } from 'lucide-react';
 
-export default function PaymentRedirectPage() {
+export const dynamic = 'force-dynamic';
+
+function RedirectContent() {
   const searchParams = useSearchParams();
   const [isRedirecting, setIsRedirecting] = useState(true);
 
@@ -67,3 +69,11 @@ export default function PaymentRedirectPage() {
     </div>
   );
 } 
+
+export default function PaymentRedirectPage() {
+  return (
+    <Suspense fallback={null}>
+      <RedirectContent />
+    </Suspense>
+  );
+}
