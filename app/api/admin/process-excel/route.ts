@@ -184,26 +184,12 @@ export async function POST(request: NextRequest) {
           throw new Error('Extensión no permitida. Solo .xlsx y .xls')
         }
         
-        // Guardar archivo temporalmente
-        const tempDir = path.join(process.cwd(), 'temp');
-        await fs.mkdir(tempDir, { recursive: true });
-        
-        const safeTempName = `${Date.now()}_${sanitizeName(file.name)}`
-        const tempPath = path.join(tempDir, safeTempName);
+        // Leer archivo en memoria (sin escribir a disco, compatible con Vercel)
         const ab = await file.arrayBuffer()
         if (ab.byteLength > MAX_SIZE_BYTES) {
           throw new Error('Archivo demasiado grande (máx 50MB)')
         }
-        const buffer = Buffer.from(ab);
-        await fs.writeFile(tempPath, buffer);
-        
-        console.log(`Archivo guardado en: ${tempPath}`);
-        
-        // Verificar que el archivo existe
-        const fileExists = await fs.access(tempPath).then(() => true).catch(() => false);
-        if (!fileExists) {
-          throw new Error(`No se pudo guardar el archivo temporal: ${tempPath}`);
-        }
+        const buffer = Buffer.from(ab)
 
                        // Analizar archivo
                const { companyName, startYear: fileNameStartYear, endYear: fileNameEndYear, isQuarterly } = parseFileName(file.name);
@@ -234,12 +220,7 @@ export async function POST(request: NextRequest) {
         const finalRelativePath = upload.pathname // p.ej. paid/<productId>/<filename>
         console.log(`Archivo subido a blob: ${finalRelativePath}`)
         
-        // Limpiar archivo temporal
-        try {
-          await fs.unlink(tempPath);
-        } catch (cleanupError) {
-          console.warn(`No se pudo eliminar archivo temporal: ${tempPath}`, cleanupError);
-        }
+        // No se requiere limpieza: no escribimos a disco en serverless
 
                        // Crear producto
         const productId = `${companyName.toLowerCase().replace(/\s+/g, '-')}-${startYear}-${endYear}-${isQuarterly ? 'trimestral' : 'anual'}`;
@@ -280,13 +261,7 @@ export async function POST(request: NextRequest) {
         console.error(`Error procesando ${file.name}:`, error);
         errors.push(`${file.name}: ${error instanceof Error ? error.message : 'Error desconocido'}`);
         
-        // Limpiar archivo temporal en caso de error
-        try {
-          const tempPath = path.join(process.cwd(), 'temp', file.name);
-          await fs.unlink(tempPath);
-        } catch (cleanupError) {
-          console.warn(`No se pudo limpiar archivo temporal: ${file.name}`, cleanupError);
-        }
+        // No se requiere limpieza: no escribimos a disco en serverless
       }
     }
 
