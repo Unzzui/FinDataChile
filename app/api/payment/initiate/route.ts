@@ -40,11 +40,14 @@ export async function POST(request: NextRequest) {
     const transaction = createWebpayPlusTransaction();
 
     // Crear transacción en Transbank
+    // Construir returnUrl dinámicamente según el host de la solicitud
+    const origin = request.nextUrl.origin;
+    const dynamicReturnUrl = `${origin}/payment/return`;
     const createResponse = await transaction.create(
       buyOrder,
       sessionId,
       amount,
-      transbankConfig.returnUrl
+      dynamicReturnUrl
     );
 
     if (!createResponse || !createResponse.url || !createResponse.token) {
@@ -76,7 +79,8 @@ export async function POST(request: NextRequest) {
         sessionId,
         amount,
         token: createResponse.token,
-        url: createResponse.url
+        url: createResponse.url,
+        returnUrl: dynamicReturnUrl
       });
 
       // Usar la URL correcta de Transbank para integración

@@ -11,8 +11,8 @@ export const transbankConfig = {
   baseUrl: 'https://webpay3gint.transbank.cl',
   productionUrl: 'https://webpay3g.transbank.cl',
   // URLs de retorno
-  returnUrl: (process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000') + '/payment/return',
-  cancelUrl: (process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000') + '/payment/cancel',
+  returnUrl: (process.env.NEXT_PUBLIC_BASE_URL || '') + '/payment/return',
+  cancelUrl: (process.env.NEXT_PUBLIC_BASE_URL || '') + '/payment/cancel',
   // Configuración de la aplicación
   sessionId: '',
   amount: 0,
