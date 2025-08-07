@@ -4,9 +4,10 @@ import { XCircle, ArrowLeft, RefreshCw } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import Link from 'next/link';
+import { Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
 
-export default function PaymentErrorPage() {
+function ErrorContent() {
   const searchParams = useSearchParams();
   const reason = searchParams.get('reason') || 'Error en el procesamiento del pago';
 
@@ -58,3 +59,11 @@ export default function PaymentErrorPage() {
     </div>
   );
 } 
+
+export default function PaymentErrorPage() {
+  return (
+    <Suspense fallback={null}>
+      <ErrorContent />
+    </Suspense>
+  );
+}

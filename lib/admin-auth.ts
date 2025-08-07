@@ -21,22 +21,20 @@ function base64urlString(input: string) {
 }
 
 async function hmacSha256Sign(data: string, secret: string): Promise<string> {
-  if (typeof crypto !== 'undefined' && (crypto as any).subtle) {
-    const enc = new TextEncoder()
-    const key = await crypto.subtle.importKey(
-      'raw',
-      enc.encode(secret),
-      { name: 'HMAC', hash: 'SHA-256' },
-      false,
-      ['sign']
-    )
-    const sigBuf = await crypto.subtle.sign('HMAC', key, enc.encode(data))
-    return base64urlFromBytes(new Uint8Array(sigBuf))
-  } else {
-    const { createHmac } = await import('crypto')
-    const sig = createHmac('sha256', secret).update(data).digest()
-    return sig.toString('base64').replace(/=/g, '').replace(/\+/g, '-').replace(/\//g, '_')
+  const webCrypto: Crypto | undefined = (globalThis as any).crypto
+  if (!webCrypto || !webCrypto.subtle) {
+    throw new Error('WebCrypto API not available for HMAC. Ensure runtime supports crypto.subtle')
   }
+  const enc = new TextEncoder()
+  const key = await webCrypto.subtle.importKey(
+    'raw',
+    enc.encode(secret),
+    { name: 'HMAC', hash: 'SHA-256' },
+    false,
+    ['sign']
+  )
+  const sigBuf = await webCrypto.subtle.sign('HMAC', key, enc.encode(data))
+  return base64urlFromBytes(new Uint8Array(sigBuf))
 }
 
 export async function createAdminToken(subject: string, ttlSeconds = 60 * 60 * 24) {
