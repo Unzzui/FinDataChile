@@ -1,0 +1,1 @@
+// Eliminado: ya no inicializamos SQLite. El esquema debe existir en Postgres.

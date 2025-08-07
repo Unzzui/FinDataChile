@@ -1,0 +1,114 @@
+import { NextRequest, NextResponse } from 'next/server';
+import { transbankConfig, generateBuyOrder, generateSessionId, createWebpayPlusTransaction } from '@/lib/transbank-config';
+import { pgQuery } from '@/lib/pg';
+import { verifyUserToken } from '@/lib/user-auth';
+
+export async function POST(request: NextRequest) {
+  try {
+    const body = await request.json();
+    const { productIds, customerEmail, customerName } = body;
+
+    // Preferir usuario autenticado vía cookie
+    const token = request.cookies.get('userToken')?.value
+    const payload = verifyUserToken(token)
+    const effectiveEmail = payload?.email || customerEmail
+    const effectiveName = payload?.name || customerName || ''
+
+    if (!productIds || !Array.isArray(productIds) || productIds.length === 0) {
+      return NextResponse.json(
+        { error: 'Se requiere al menos un producto' },
+        { status: 400 }
+      );
+    }
+
+    // Obtener productos desde la base de datos y calcular total
+    let total = 0;
+    
+    const { getProductsByIds } = await import('@/lib/database')
+    const priceRows = await getProductsByIds(productIds)
+    for (const row of priceRows) total += Number(row.price || 0)
+    
+    // Convertir de USD a CLP (aproximadamente 1 USD = 1000 CLP)
+    const usdToClpRate = 1000;
+    const amount = Math.round(total * usdToClpRate); // Transbank requiere el monto en pesos chilenos
+
+    // Generar identificadores únicos
+    const buyOrder = generateBuyOrder();
+    const sessionId = generateSessionId();
+
+    // Crear instancia de WebPay Plus
+    const transaction = createWebpayPlusTransaction();
+
+    // Crear transacción en Transbank
+    const createResponse = await transaction.create(
+      buyOrder,
+      sessionId,
+      amount,
+      transbankConfig.returnUrl
+    );
+
+    if (!createResponse || !createResponse.url || !createResponse.token) {
+      throw new Error('Error al crear transacción en Transbank');
+    }
+
+    // Persistir transacción en BD (Postgres)
+    await pgQuery(
+      `INSERT INTO transactions (id, customer_email, customer_name, total_amount, status, transbank_token, created_at)
+       VALUES ($1, $2, $3, $4, $5, $6, NOW())`,
+      [buyOrder, effectiveEmail || '', effectiveName || '', amount, 'pending', createResponse.token]
+    )
+
+    // Guardar productos de la transacción para referencia en el retorno
+    for (const pid of productIds) {
+      const row = priceRows.find((r: any) => r.id === pid)
+      const price = row ? Number(row.price || 0) : 0
+      await pgQuery(
+        `INSERT INTO transaction_products (transaction_id, product_id, price, created_at)
+         VALUES ($1, $2, $3, NOW())`,
+        [buyOrder, pid, price]
+      )
+    }
+
+    // En modo demo, simular respuesta exitosa
+    if (transbankConfig.environment === 'integration') {
+      console.log('Transacción creada en modo integración:', {
+        buyOrder,
+        sessionId,
+        amount,
+        token: createResponse.token,
+        url: createResponse.url
+      });
+
+      // Usar la URL correcta de Transbank para integración
+      // Según la documentación, la URL debe ser la que devuelve la librería
+      const correctUrl = createResponse.url;
+      
+      return NextResponse.json({
+        success: true,
+        redirectUrl: correctUrl,
+        token: createResponse.token,
+        transactionId: buyOrder,
+        buyOrder: buyOrder, // Incluir buyOrder explícitamente
+        amount: amount, // Devolver monto en pesos
+        isTestMode: true, // Indicar que estamos en modo de prueba
+      });
+    }
+
+    // En producción, redirigir inmediatamente
+    return NextResponse.json({
+      success: true,
+      redirectUrl: createResponse.url,
+      token: createResponse.token,
+      transactionId: buyOrder,
+      buyOrder: buyOrder, // Incluir buyOrder explícitamente
+      amount: amount, // Devolver monto en pesos
+    });
+
+  } catch (error) {
+    console.error('Error iniciando pago:', error);
+    return NextResponse.json(
+      { error: 'Error interno del servidor' },
+      { status: 500 }
+    );
+  }
+}
