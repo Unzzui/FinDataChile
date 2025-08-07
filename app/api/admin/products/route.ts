@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { pgQuery } from '@/lib/pg';
+import { blobStorage } from '@/lib/vercel-blob-storage';
 
 // GET - Obtener todos los productos
 export async function GET() {
@@ -82,7 +83,29 @@ export async function DELETE(request: NextRequest) {
       );
     }
 
-    // Eliminar el producto y relaciones
+    // Intentar eliminar archivos asociados en Vercel Blob
+    try {
+      // 1) Si hay un file_path concreto, borrar ese archivo
+      if (product.file_path) {
+        const parts = String(product.file_path).split('/');
+        const filename = parts[parts.length - 1];
+        if (filename) {
+          await blobStorage.deleteFile(productId, filename);
+        }
+      }
+      // 2) Defensa en profundidad: listar por prefijo y borrar todos los archivos del producto
+      const files = await blobStorage.listProductFiles(productId);
+      for (const f of files) {
+        if (f.filename) {
+          await blobStorage.deleteFile(productId, f.filename as string);
+        }
+      }
+    } catch (blobError) {
+      console.warn(`No se pudieron eliminar archivos del producto ${productId} en Blob:`, blobError);
+      // No interrumpir la eliminación en BD por errores del storage
+    }
+
+    // Eliminar el producto y relaciones en BD
     await pgQuery('DELETE FROM cart_items WHERE product_id = $1', [productId]);
     await pgQuery('DELETE FROM purchases WHERE product_id = $1', [productId]);
     await pgQuery('DELETE FROM download_history WHERE product_id = $1', [productId]);
