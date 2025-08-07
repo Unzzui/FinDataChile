@@ -28,9 +28,8 @@ export class VercelBlobStorage {
   ): Promise<UploadResult> {
     try {
       const pathname = `paid/${productId}/${filename}`;
-      
       const blob = await put(pathname, buffer, {
-        access: 'private', // Solo accesible con token
+        access: 'public',
         token: this.token,
         contentType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
       });
@@ -66,7 +65,8 @@ export class VercelBlobStorage {
         throw new Error('File not found');
       }
 
-      return file.downloadUrl; // URL firmada temporalmente
+      // Para blobs privados, usar downloadUrl; si es público, usar url
+      return file.downloadUrl || file.url;
     } catch (error) {
       console.error('Error getting download URL:', error);
       throw new Error('Failed to get download URL');
@@ -104,7 +104,7 @@ export class VercelBlobStorage {
         size: blob.size,
         uploadedAt: blob.uploadedAt,
         url: blob.url,
-        downloadUrl: blob.downloadUrl
+        downloadUrl: blob.downloadUrl || blob.url
       }));
     } catch (error) {
       console.error('Error listing files:', error);
