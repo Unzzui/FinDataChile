@@ -39,6 +39,8 @@ export default function ComprasPage() {
   const { toast } = useToast()
   const router = useRouter()
 
+  const formatClp = (v: number) => new Intl.NumberFormat('es-CL', { style: 'currency', currency: 'CLP', maximumFractionDigits: 0 }).format(Math.round(Number(v || 0)))
+
   // Cargar email automáticamente desde localStorage
   useEffect(() => {
     const savedEmail = localStorage.getItem('userEmail')
@@ -292,7 +294,7 @@ export default function ComprasPage() {
             </div>
             <div>
               <div className="text-2xl font-light text-gray-900">
-                ${purchases.reduce((sum, p) => sum + Number(p.price || 0), 0).toLocaleString()}
+                {formatClp(purchases.reduce((sum, p) => sum + Number(p.price || 0), 0))}
               </div>
               <div className="text-sm text-gray-600">Total</div>
             </div>
@@ -385,7 +387,7 @@ export default function ComprasPage() {
                           <div className="space-y-2 text-sm text-gray-600 mb-6">
                             <div>{purchase.sector}</div>
                             <div>{purchase.year_range}</div>
-                            <div className="font-medium text-gray-900">${purchase.price.toLocaleString()}</div>
+                            <div className="font-medium text-gray-900">{formatClp(purchase.price)}</div>
                             <div className="text-xs">{new Date(purchase.created_at).toLocaleDateString()}</div>
                           </div>
 
@@ -420,7 +422,7 @@ export default function ComprasPage() {
                               <div className="flex gap-6 text-sm text-gray-600">
                                 <span>{purchase.sector}</span>
                                 <span>{purchase.year_range}</span>
-                                <span className="font-medium text-gray-900">${purchase.price.toLocaleString()}</span>
+                                <span className="font-medium text-gray-900">{formatClp(purchase.price)}</span>
                                 <span className="text-xs">{new Date(purchase.created_at).toLocaleDateString()}</span>
                               </div>
                             </div>
