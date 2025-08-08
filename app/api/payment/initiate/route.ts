@@ -28,9 +28,8 @@ export async function POST(request: NextRequest) {
     const priceRows = await getProductsByIds(productIds)
     for (const row of priceRows) total += Number(row.price || 0)
     
-    // Convertir de USD a CLP (aproximadamente 1 USD = 1000 CLP)
-    const usdToClpRate = 1000;
-    const amount = Math.round(total * usdToClpRate); // Transbank requiere el monto en pesos chilenos
+    // Precios definidos en CLP en la BD. Transbank requiere CLP.
+    const amount = Math.round(total)
 
     // Generar identificadores únicos
     const buyOrder = generateBuyOrder();

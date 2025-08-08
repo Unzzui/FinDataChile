@@ -10,6 +10,7 @@ import { usePayment } from "@/hooks/use-payment"
 import { useToast } from "@/hooks/use-toast"
 
 export function SubscriptionPlans() {
+  const enabled = typeof window !== 'undefined' ? (process.env.NEXT_PUBLIC_SUBSCRIPTIONS_ENABLED === 'true') : false
   const [selectedPlan, setSelectedPlan] = useState<string | null>(null)
   const [customerEmail, setCustomerEmail] = useState("")
   const [customerName, setCustomerName] = useState("")
@@ -17,6 +18,7 @@ export function SubscriptionPlans() {
   const { toast } = useToast()
 
   const handleSubscribe = async (planKey: string) => {
+    if (!enabled) return
     if (!customerEmail || !customerName) {
       toast({
         title: "Información requerida",
@@ -57,10 +59,18 @@ export function SubscriptionPlans() {
     <div className="space-y-8">
       <div className="text-center">
         <h2 className="text-3xl font-bold mb-4">Planes de Suscripción</h2>
-        <p className="text-gray-600 max-w-2xl mx-auto">
-          Recibe estados financieros automáticamente cuando estén disponibles. 
-          Elige el plan que mejor se adapte a tus necesidades.
-        </p>
+        {enabled ? (
+          <p className="text-gray-600 max-w-2xl mx-auto">
+            Recibe estados financieros automáticamente cuando estén disponibles. 
+            Elige el plan que mejor se adapte a tus necesidades.
+          </p>
+        ) : (
+          <div className="flex items-center justify-center">
+            <span className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-yellow-100 text-yellow-800 text-sm font-medium">
+              Próximamente
+            </span>
+          </div>
+        )}
       </div>
 
       <div className="grid md:grid-cols-3 gap-6">
@@ -74,6 +84,9 @@ export function SubscriptionPlans() {
                 Más Popular
               </Badge>
             )}
+            {!enabled && (
+              <Badge className="absolute -top-2 right-2 bg-yellow-500">Próximamente</Badge>
+            )}
             
             <CardHeader className="text-center">
               <div className="flex justify-center mb-2">
@@ -85,7 +98,9 @@ export function SubscriptionPlans() {
             
             <CardContent className="space-y-4">
               <div className="text-center">
-                <span className="text-3xl font-bold">${plan.price}</span>
+                <span className="text-3xl font-bold">
+                  {new Intl.NumberFormat('es-CL', { style: 'currency', currency: 'CLP', maximumFractionDigits: 0 }).format(Number(plan.price || 0))}
+                </span>
                 <span className="text-gray-600">/mes</span>
               </div>
 
@@ -117,7 +132,7 @@ export function SubscriptionPlans() {
 
               <Button
                 onClick={() => handleSubscribe(planKey)}
-                disabled={isProcessing}
+                disabled={isProcessing || !enabled}
                 className={`w-full ${
                   planKey === 'quarterly' 
                     ? 'bg-orange-600 hover:bg-orange-700' 
@@ -126,8 +141,10 @@ export function SubscriptionPlans() {
               >
                 {isProcessing ? (
                   <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                ) : enabled ? (
+                  `Suscribirse - ${new Intl.NumberFormat('es-CL', { style: 'currency', currency: 'CLP', maximumFractionDigits: 0 }).format(Number(plan.price || 0))}/mes`
                 ) : (
-                  `Suscribirse - $${plan.price}/mes`
+                  'Próximamente'
                 )}
               </Button>
             </CardContent>

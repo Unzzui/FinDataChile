@@ -88,6 +88,20 @@ CREATE TABLE IF NOT EXISTS transaction_products (
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
+-- Tabla para encuesta de suscripciones
+CREATE TABLE IF NOT EXISTS subscription_survey (
+  id SERIAL PRIMARY KEY,
+  name VARCHAR(255) NOT NULL,
+  email VARCHAR(255) NOT NULL,
+  would_pay BOOLEAN NOT NULL,
+  interests JSONB DEFAULT '[]'::jsonb, -- Array de intereses seleccionados
+  use_case TEXT, -- Descripción del caso de uso
+  ip_address INET,
+  user_agent TEXT,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
 -- Índices para performance
 CREATE INDEX IF NOT EXISTS idx_products_active ON products(is_active);
 CREATE INDEX IF NOT EXISTS idx_products_sector ON products(sector);
@@ -95,8 +109,12 @@ CREATE INDEX IF NOT EXISTS idx_cart_user ON cart_items(user_email);
 CREATE INDEX IF NOT EXISTS idx_purchases_user ON purchases(user_email);
 CREATE INDEX IF NOT EXISTS idx_downloads_user ON download_history(user_email);
 CREATE INDEX IF NOT EXISTS idx_transactions_status ON transactions(status);
+CREATE INDEX IF NOT EXISTS idx_subscription_survey_email ON subscription_survey(email);
+CREATE INDEX IF NOT EXISTS idx_subscription_survey_would_pay ON subscription_survey(would_pay);
+CREATE INDEX IF NOT EXISTS idx_subscription_survey_created_at ON subscription_survey(created_at);
 
 -- Comentarios para documentación
 COMMENT ON TABLE product_files IS 'Almacena los archivos Excel directamente en la base de datos como BYTEA';
 COMMENT ON COLUMN product_files.file_content IS 'Contenido binario del archivo Excel (máx ~30KB por archivo)';
 COMMENT ON COLUMN product_files.file_size IS 'Tamaño del archivo en bytes para validación';
+COMMENT ON TABLE subscription_survey IS 'Almacena respuestas de la encuesta de interés en suscripciones premium';

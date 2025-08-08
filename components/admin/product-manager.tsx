@@ -9,7 +9,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Switch } from "@/components/ui/switch"
 import { Badge } from "@/components/ui/badge"
 import { useToast } from "@/hooks/use-toast"
-import { Plus, Edit, Trash2, Save, X, Loader2 } from "lucide-react"
+import { Plus, Edit, Trash2, Save, X, Loader2, Package, TrendingUp, DollarSign, Calendar, Building, Filter, Search, BarChart3, Grid3X3, List, CheckSquare, Square } from "lucide-react"
+import { Checkbox } from "@/components/ui/checkbox"
 
 interface Product {
   id: string;
@@ -30,9 +31,15 @@ interface Product {
 
 export function ProductManager() {
   const [productList, setProductList] = useState<Product[]>([])
+  const [filteredProducts, setFilteredProducts] = useState<Product[]>([])
   const [loading, setLoading] = useState(true)
   const [editingProduct, setEditingProduct] = useState<Product | null>(null)
   const [isAddingProduct, setIsAddingProduct] = useState(false)
+  const [searchTerm, setSearchTerm] = useState('')
+  const [selectedSector, setSelectedSector] = useState('all')
+  const [selectedStatus, setSelectedStatus] = useState('all')
+  const [selectedProducts, setSelectedProducts] = useState<string[]>([])
+  const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid')
   const { toast } = useToast()
 
   // Cargar productos desde la API
@@ -60,6 +67,7 @@ export function ProductManager() {
             updatedAt: product.updated_at
           }))
           setProductList(transformedProducts)
+          setFilteredProducts(transformedProducts)
         } else {
           console.error('Error cargando productos:', response.status)
         }
@@ -78,6 +86,34 @@ export function ProductManager() {
     loadProducts()
   }, [toast])
 
+  // Efecto para filtrar productos
+  useEffect(() => {
+    let filtered = productList
+
+    // Filtrar por término de búsqueda
+    if (searchTerm) {
+      filtered = filtered.filter(product => 
+        product.companyName.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        product.sector.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        product.description.toLowerCase().includes(searchTerm.toLowerCase())
+      )
+    }
+
+    // Filtrar por sector
+    if (selectedSector !== 'all') {
+      filtered = filtered.filter(product => product.sector === selectedSector)
+    }
+
+    // Filtrar por estado
+    if (selectedStatus !== 'all') {
+      filtered = filtered.filter(product => 
+        selectedStatus === 'active' ? product.isActive : !product.isActive
+      )
+    }
+
+    setFilteredProducts(filtered)
+  }, [productList, searchTerm, selectedSector, selectedStatus])
+
   const sectors = ['Bancario', 'Retail', 'Minería', 'Energía', 'Telecomunicaciones', 'AFP', 'Salud', 'Transporte', 'Consumo', 'Inmobiliario']
 
   const handleAddProduct = () => {
@@ -89,7 +125,7 @@ export function ProductManager() {
       yearRange: '',
       startYear: 2024,
       endYear: 2024,
-      price: 2,
+  price: 2000,
       filePath: '',
       description: '',
       isActive: true,
@@ -252,56 +288,152 @@ export function ProductManager() {
     }
   }
 
+  const handleSelectProduct = (productId: string) => {
+    setSelectedProducts(prev => 
+      prev.includes(productId) 
+        ? prev.filter(id => id !== productId)
+        : [...prev, productId]
+    )
+  }
+
+  const handleSelectAll = () => {
+    if (selectedProducts.length === filteredProducts.length) {
+      setSelectedProducts([])
+    } else {
+      setSelectedProducts(filteredProducts.map(p => p.id))
+    }
+  }
+
+  const handleDeleteSelected = async () => {
+    if (selectedProducts.length === 0) return
+
+    try {
+      const deletePromises = selectedProducts.map(productId =>
+        fetch(`/api/admin/products/${productId}`, { method: 'DELETE' })
+      )
+      
+      await Promise.all(deletePromises)
+      
+      setProductList(prev => prev.filter(p => !selectedProducts.includes(p.id)))
+      setSelectedProducts([])
+      
+      toast({
+        title: "Éxito",
+        description: `${selectedProducts.length} productos eliminados correctamente`
+      })
+    } catch (error) {
+      console.error('Error eliminando productos:', error)
+      toast({
+        title: "Error",
+        description: "No se pudieron eliminar algunos productos",
+        variant: "destructive"
+      })
+    }
+  }
+
   const handleCancelEdit = () => {
     setEditingProduct(null)
     setIsAddingProduct(false)
   }
 
   return (
-    <div className="space-y-6">
-      <div className="flex justify-between items-center">
-        <h2 className="text-2xl font-bold">Administración de Productos</h2>
-        <Button onClick={handleAddProduct} className="bg-green-600 hover:bg-green-700">
-          <Plus className="h-4 w-4 mr-2" />
-          Agregar Producto
-        </Button>
-      </div>
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 to-blue-50/30">
+      <div className="space-y-8">
+        {/* Enhanced Header */}
+        <div className="bg-white border-b border-slate-200/60 -mx-6 -mt-6 px-6 pt-6 pb-8">
+          <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-6">
+            <div className="space-y-2">
+              <h1 className="text-4xl font-black text-slate-900 tracking-tight">
+                Gestión de Productos
+              </h1>
+              <p className="text-lg text-slate-600">
+                Administra el catálogo completo de productos financieros
+              </p>
+              <div className="flex items-center gap-6 text-sm">
+                <div className="flex items-center gap-2">
+                  <Package className="h-4 w-4 text-blue-500" />
+                  <span className="font-medium text-slate-700">{filteredProducts.length} productos</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <TrendingUp className="h-4 w-4 text-emerald-500" />
+                  <span className="font-medium text-slate-700">{filteredProducts.filter(p => p.isActive).length} activos</span>
+                </div>
+                {selectedProducts.length > 0 && (
+                  <div className="flex items-center gap-2">
+                    <CheckSquare className="h-4 w-4 text-orange-500" />
+                    <span className="font-medium text-slate-700">{selectedProducts.length} seleccionados</span>
+                  </div>
+                )}
+              </div>
+            </div>
+            <div className="flex items-center gap-3">
+              {/* View Mode Toggle */}
+              <div className="flex items-center bg-slate-100 rounded-lg p-1">
+                <Button
+                  size="sm"
+                  variant={viewMode === 'grid' ? 'default' : 'ghost'}
+                  onClick={() => setViewMode('grid')}
+                  className="h-8 px-3"
+                >
+                  <Grid3X3 className="h-4 w-4" />
+                </Button>
+                <Button
+                  size="sm"
+                  variant={viewMode === 'list' ? 'default' : 'ghost'}
+                  onClick={() => setViewMode('list')}
+                  className="h-8 px-3"
+                >
+                  <List className="h-4 w-4" />
+                </Button>
+              </div>
 
-      {/* Formulario de edición */}
-      {editingProduct && (
-        <Card className="border-2 border-blue-200">
-          <CardHeader>
-            <CardTitle className="flex items-center justify-between">
-              {isAddingProduct ? "Agregar Producto" : "Editar Producto"}
-              <div className="flex gap-2">
-                <Button size="sm" onClick={handleSaveProduct} className="bg-green-600 hover:bg-green-700">
-                  <Save className="h-4 w-4 mr-1" />
-                  Guardar
+              {/* Delete Selected Button */}
+              {selectedProducts.length > 0 && (
+                <Button
+                  onClick={handleDeleteSelected}
+                  variant="destructive"
+                  className="h-11"
+                >
+                  <Trash2 className="h-4 w-4 mr-2" />
+                  Eliminar ({selectedProducts.length})
                 </Button>
-                <Button size="sm" variant="outline" onClick={handleCancelEdit}>
-                  <X className="h-4 w-4 mr-1" />
-                  Cancelar
-                </Button>
+              )}
+
+              <Button 
+                onClick={handleAddProduct} 
+                className="h-11 bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 shadow-lg"
+              >
+                <Plus className="h-4 w-4 mr-2" />
+                Nuevo Producto
+              </Button>
+            </div>
+          </div>
+        </div>
+
+        {/* Enhanced Filters */}
+        <Card className="border-0 shadow-lg bg-gradient-to-br from-white to-slate-50/50">
+          <CardContent className="p-6">
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+              <div className="space-y-2">
+                <Label className="text-sm font-medium text-slate-700">Buscar productos</Label>
+                <div className="relative">
+                  <Search className="absolute left-3 top-3 h-4 w-4 text-slate-400" />
+                  <Input
+                    placeholder="Buscar por empresa, sector o descripción..."
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                    className="pl-10 border-slate-200 bg-white shadow-sm"
+                  />
+                </div>
               </div>
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <Label htmlFor="companyName">Nombre de Empresa</Label>
-                <Input
-                  id="companyName"
-                  value={editingProduct.companyName}
-                  onChange={(e) => setEditingProduct(prev => prev ? { ...prev, companyName: e.target.value } : null)}
-                />
-              </div>
-              <div>
-                <Label htmlFor="sector">Sector</Label>
-                <Select value={editingProduct.sector} onValueChange={(value: string) => setEditingProduct(prev => prev ? { ...prev, sector: value } : null)}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Seleccionar sector" />
+              <div className="space-y-2">
+                <Label className="text-sm font-medium text-slate-700">Sector</Label>
+                <Select value={selectedSector} onValueChange={setSelectedSector}>
+                  <SelectTrigger className="border-slate-200 bg-white shadow-sm">
+                    <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
+                    <SelectItem value="all">Todos los sectores</SelectItem>
                     {sectors.map((sector) => (
                       <SelectItem key={sector} value={sector}>
                         {sector}
@@ -310,94 +442,261 @@ export function ProductManager() {
                   </SelectContent>
                 </Select>
               </div>
-              <div>
-                <Label htmlFor="startYear">Año Inicio</Label>
-                <Input
-                  id="startYear"
-                  type="number"
-                  value={editingProduct.startYear}
-                  onChange={(e) => setEditingProduct(prev => prev ? { ...prev, startYear: parseInt(e.target.value) } : null)}
-                />
+              <div className="space-y-2">
+                <Label className="text-sm font-medium text-slate-700">Estado</Label>
+                <Select value={selectedStatus} onValueChange={setSelectedStatus}>
+                  <SelectTrigger className="border-slate-200 bg-white shadow-sm">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">Todos</SelectItem>
+                    <SelectItem value="active">Activos</SelectItem>
+                    <SelectItem value="inactive">Inactivos</SelectItem>
+                  </SelectContent>
+                </Select>
               </div>
-              <div>
-                <Label htmlFor="endYear">Año Fin</Label>
-                <Input
-                  id="endYear"
-                  type="number"
-                  value={editingProduct.endYear}
-                  onChange={(e) => setEditingProduct(prev => prev ? { ...prev, endYear: parseInt(e.target.value) } : null)}
-                />
-              </div>
-              <div>
-                <Label htmlFor="price">Precio (USD)</Label>
-                <Input
-                  id="price"
-                  type="number"
-                  value={editingProduct.price}
-                  onChange={(e) => setEditingProduct(prev => prev ? { ...prev, price: parseFloat(e.target.value) } : null)}
-                />
-              </div>
-              <div>
-                <Label htmlFor="filePath">Ruta del Archivo</Label>
-                <Input
-                  id="filePath"
-                  value={editingProduct.filePath}
-                  onChange={(e) => setEditingProduct(prev => prev ? { ...prev, filePath: e.target.value } : null)}
-                />
+              <div className="space-y-2">
+                <Label className="text-sm font-medium text-slate-700">Estadísticas</Label>
+                <div className="flex items-center gap-2 p-3 bg-gradient-to-r from-blue-50 to-indigo-50 rounded-lg border border-blue-100">
+                  <BarChart3 className="h-4 w-4 text-blue-600" />
+                  <span className="text-sm font-semibold text-blue-700">
+                    {Math.round((filteredProducts.filter(p => p.isActive).length / Math.max(filteredProducts.length, 1)) * 100)}% activos
+                  </span>
+                </div>
               </div>
             </div>
-            <div>
-              <Label htmlFor="description">Descripción</Label>
-              <Input
-                id="description"
-                value={editingProduct.description}
-                onChange={(e) => setEditingProduct(prev => prev ? { ...prev, description: e.target.value } : null)}
-              />
-            </div>
-            <div className="flex items-center space-x-2">
-                              <Switch
-                  id="isActive"
-                  checked={editingProduct.isActive}
-                  onCheckedChange={(checked: boolean) => setEditingProduct(prev => prev ? { ...prev, isActive: checked } : null)}
-                />
-              <Label htmlFor="isActive">Producto Activo</Label>
-            </div>
+            
+            {/* Select All Checkbox */}
+            {filteredProducts.length > 0 && (
+              <div className="flex items-center justify-between pt-4 border-t border-slate-200">
+                <div className="flex items-center space-x-2">
+                  <Checkbox
+                    id="select-all"
+                    checked={selectedProducts.length === filteredProducts.length}
+                    onCheckedChange={handleSelectAll}
+                  />
+                  <Label htmlFor="select-all" className="text-sm font-medium text-slate-700">
+                    Seleccionar todos ({filteredProducts.length} productos)
+                  </Label>
+                </div>
+                {selectedProducts.length > 0 && (
+                  <span className="text-sm text-slate-600">
+                    {selectedProducts.length} de {filteredProducts.length} seleccionados
+                  </span>
+                )}
+              </div>
+            )}
           </CardContent>
         </Card>
-      )}
 
-      {/* Lista de productos */}
-      {loading ? (
-        <div className="flex items-center justify-center py-8">
-          <Loader2 className="h-8 w-8 animate-spin mr-2" />
-          <span>Cargando productos...</span>
-        </div>
-      ) : (
-        <div className="grid gap-4">
-          {productList.map((product) => (
-            <Card key={product.id} className={!product.isActive ? "opacity-60" : ""}>
-              <CardContent className="p-4">
-                <div className="flex items-center justify-between">
-                  <div className="flex-1">
-                    <div className="flex items-center gap-2 mb-2">
-                      <h3 className="font-semibold">{product.companyName}</h3>
-                      <Badge variant={product.isActive ? "default" : "secondary"}>
-                        {product.isActive ? "Activo" : "Inactivo"}
-                      </Badge>
-                      <Badge variant="outline">{product.sector}</Badge>
+        {/* Formulario de edición */}
+        {editingProduct && (
+          <Card className="border-2 border-blue-200 shadow-lg">
+            <CardHeader className="bg-gradient-to-r from-blue-50 to-indigo-50">
+              <CardTitle className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <Package className="h-5 w-5 text-blue-600" />
+                  {isAddingProduct ? "Agregar Producto" : "Editar Producto"}
+                </div>
+                <div className="flex gap-2">
+                  <Button size="sm" onClick={handleSaveProduct} className="bg-green-600 hover:bg-green-700">
+                    <Save className="h-4 w-4 mr-1" />
+                    Guardar
+                  </Button>
+                  <Button size="sm" variant="outline" onClick={handleCancelEdit}>
+                    <X className="h-4 w-4 mr-1" />
+                    Cancelar
+                  </Button>
+                </div>
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="p-6">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div className="space-y-4">
+                  <div>
+                    <Label>Empresa</Label>
+                    <Input
+                      value={editingProduct.companyName}
+                      onChange={(e) => setEditingProduct({ ...editingProduct, companyName: e.target.value })}
+                      placeholder="Nombre de la empresa"
+                    />
+                  </div>
+                  <div>
+                    <Label>Sector</Label>
+                    <Select 
+                      value={editingProduct.sector} 
+                      onValueChange={(value) => setEditingProduct({ ...editingProduct, sector: value })}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Selecciona un sector" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {sectors.map((sector) => (
+                          <SelectItem key={sector} value={sector}>{sector}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div>
+                    <Label>Descripción</Label>
+                    <textarea
+                      className="w-full p-2 border rounded-md"
+                      value={editingProduct.description}
+                      onChange={(e) => setEditingProduct({ ...editingProduct, description: e.target.value })}
+                      placeholder="Descripción del producto"
+                      rows={3}
+                    />
+                  </div>
+                </div>
+                <div className="space-y-4">
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <Label>Año Inicio</Label>
+                      <Input
+                        type="number"
+                        value={editingProduct.startYear}
+                        onChange={(e) => setEditingProduct({ ...editingProduct, startYear: parseInt(e.target.value) || 2024 })}
+                      />
                     </div>
-                    <p className="text-sm text-gray-600 mb-2">{product.description}</p>
-                    <div className="flex items-center gap-4 text-sm">
-                      <span>Rango: {product.yearRange}</span>
-                      <span>Precio: ${product.price} USD</span>
-                      <span>Archivo: {product.filePath}</span>
+                    <div>
+                      <Label>Año Fin</Label>
+                      <Input
+                        type="number"
+                        value={editingProduct.endYear}
+                        onChange={(e) => setEditingProduct({ ...editingProduct, endYear: parseInt(e.target.value) || 2024 })}
+                      />
                     </div>
                   </div>
-                  <div className="flex gap-2">
+                  <div>
+                    <Label>Precio (CLP)</Label>
+                    <Input
+                      type="number"
+                      value={editingProduct.price}
+                      onChange={(e) => setEditingProduct({ ...editingProduct, price: parseInt(e.target.value) || 0 })}
+                    />
+                  </div>
+                  <div>
+                    <Label>Ruta del Archivo</Label>
+                    <Input
+                      value={editingProduct.filePath}
+                      onChange={(e) => setEditingProduct({ ...editingProduct, filePath: e.target.value })}
+                      placeholder="storage/uploads/..."
+                    />
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    <input
+                      type="checkbox"
+                      id="isActive"
+                      checked={editingProduct.isActive}
+                      onChange={(e) => setEditingProduct({ ...editingProduct, isActive: e.target.checked })}
+                    />
+                    <Label htmlFor="isActive">Producto activo</Label>
+                  </div>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
+        {/* Lista de productos mejorada */}
+        <div className={`${viewMode === 'grid' ? 'grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6' : 'space-y-4'}`}>
+          {filteredProducts.map((product) => (
+            <Card 
+              key={product.id} 
+              className={`border-0 shadow-lg hover:shadow-xl transition-all duration-300 bg-gradient-to-br from-white to-slate-50/30 ${
+                selectedProducts.includes(product.id) ? 'ring-2 ring-blue-500 ring-opacity-50' : ''
+              }`}
+            >
+              <CardContent className={viewMode === 'grid' ? 'p-6' : 'p-4'}>
+                <div className={`flex ${viewMode === 'grid' ? 'flex-col' : 'items-start justify-between'}`}>
+                  {/* Checkbox de selección */}
+                  <div className={`flex items-start gap-3 ${viewMode === 'grid' ? 'mb-4' : 'flex-1'}`}>
+                    <Checkbox
+                      checked={selectedProducts.includes(product.id)}
+                      onCheckedChange={() => handleSelectProduct(product.id)}
+                      className="mt-1"
+                    />
+                    
+                    <div className="flex-1">
+                      {viewMode === 'grid' ? (
+                        /* Vista Grid */
+                        <>
+                          <div className="flex items-center gap-3 mb-3">
+                            <div className="p-2 bg-gradient-to-br from-blue-100 to-indigo-100 rounded-lg">
+                              <Building className="h-5 w-5 text-blue-600" />
+                            </div>
+                            <div className="flex-1">
+                              <h3 className="text-lg font-bold text-slate-900 line-clamp-1">{product.companyName}</h3>
+                              <div className="flex items-center gap-2 mt-1">
+                                <Calendar className="h-4 w-4 text-slate-500" />
+                                <span className="text-sm text-slate-600">{product.yearRange}</span>
+                              </div>
+                            </div>
+                          </div>
+                          <div className="flex items-center gap-2 mb-3">
+                            <Badge variant={product.isActive ? "default" : "secondary"} className="font-medium">
+                              {product.isActive ? "Activo" : "Inactivo"}
+                            </Badge>
+                            <Badge variant="outline" className="border-blue-200 text-blue-700 bg-blue-50">
+                              {product.sector}
+                            </Badge>
+                          </div>
+                          <p className="text-slate-600 mb-4 leading-relaxed line-clamp-2">{product.description}</p>
+                          <div className="space-y-2 text-sm">
+                            <div className="flex items-center gap-2">
+                              <DollarSign className="h-4 w-4 text-emerald-500" />
+                              <span className="font-semibold text-slate-700">
+                                {new Intl.NumberFormat('es-CL', { style: 'currency', currency: 'CLP', maximumFractionDigits: 0 }).format(Number(product.price || 0))}
+                              </span>
+                            </div>
+                            <div className="flex items-center gap-2">
+                              <Package className="h-4 w-4 text-slate-500" />
+                              <span className="text-slate-600 truncate">{product.filePath || 'Sin archivo'}</span>
+                            </div>
+                          </div>
+                        </>
+                      ) : (
+                        /* Vista Lista */
+                        <>
+                          <div className="flex items-center gap-3 mb-2">
+                            <div className="p-1.5 bg-gradient-to-br from-blue-100 to-indigo-100 rounded-lg">
+                              <Building className="h-4 w-4 text-blue-600" />
+                            </div>
+                            <div>
+                              <h3 className="text-lg font-bold text-slate-900">{product.companyName}</h3>
+                              <div className="flex items-center gap-4 text-sm">
+                                <span className="flex items-center gap-1">
+                                  <Calendar className="h-3 w-3 text-slate-500" />
+                                  {product.yearRange}
+                                </span>
+                                <span className="flex items-center gap-1">
+                                  <DollarSign className="h-3 w-3 text-emerald-500" />
+                                  {new Intl.NumberFormat('es-CL', { style: 'currency', currency: 'CLP', maximumFractionDigits: 0 }).format(Number(product.price || 0))}
+                                </span>
+                              </div>
+                            </div>
+                          </div>
+                          <div className="flex items-center gap-2 mb-2">
+                            <Badge variant={product.isActive ? "default" : "secondary"} className="font-medium text-xs">
+                              {product.isActive ? "Activo" : "Inactivo"}
+                            </Badge>
+                            <Badge variant="outline" className="border-blue-200 text-blue-700 bg-blue-50 text-xs">
+                              {product.sector}
+                            </Badge>
+                          </div>
+                          <p className="text-slate-600 text-sm leading-relaxed line-clamp-1">{product.description}</p>
+                        </>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Botones de acción */}
+                  <div className={`flex gap-2 ${viewMode === 'grid' ? 'mt-4 justify-end' : 'ml-6'}`}>
                     <Button
                       size="sm"
                       variant="outline"
                       onClick={() => handleEditProduct(product)}
+                      className="hover:bg-blue-50 hover:border-blue-200"
                     >
                       <Edit className="h-4 w-4" />
                     </Button>
@@ -405,7 +704,7 @@ export function ProductManager() {
                       size="sm"
                       variant="outline"
                       onClick={() => handleDeleteProduct(product.id)}
-                      className="text-red-600 hover:text-red-700"
+                      className="text-red-600 hover:text-red-700 hover:bg-red-50 hover:border-red-200"
                     >
                       <Trash2 className="h-4 w-4" />
                     </Button>
@@ -415,13 +714,40 @@ export function ProductManager() {
             </Card>
           ))}
 
-          {productList.length === 0 && (
-            <div className="text-center py-8">
-              <p className="text-gray-500">No hay productos disponibles</p>
-            </div>
+          {filteredProducts.length === 0 && (
+            <Card className="border-0 shadow-lg">
+              <CardContent className="p-12 text-center">
+                <div className="space-y-4">
+                  <div className="p-4 bg-gradient-to-br from-slate-100 to-slate-200 rounded-full w-16 h-16 mx-auto flex items-center justify-center">
+                    <Package className="h-8 w-8 text-slate-500" />
+                  </div>
+                  <div>
+                    <h3 className="text-lg font-semibold text-slate-900 mb-2">No hay productos disponibles</h3>
+                    <p className="text-slate-600 mb-4">
+                      {searchTerm || selectedSector !== 'all' || selectedStatus !== 'all' 
+                        ? 'No se encontraron productos que coincidan con los filtros aplicados.'
+                        : 'Aún no hay productos en el catálogo.'
+                      }
+                    </p>
+                    {(searchTerm || selectedSector !== 'all' || selectedStatus !== 'all') && (
+                      <Button 
+                        variant="outline" 
+                        onClick={() => {
+                          setSearchTerm('')
+                          setSelectedSector('all')
+                          setSelectedStatus('all')
+                        }}
+                      >
+                        Limpiar filtros
+                      </Button>
+                    )}
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
           )}
         </div>
-      )}
+      </div>
     </div>
   )
 } 

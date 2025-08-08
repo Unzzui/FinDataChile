@@ -32,6 +32,7 @@ export class VercelBlobStorage {
         access: 'public',
         token: this.token,
         contentType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        allowOverwrite: true,
       });
 
       return {

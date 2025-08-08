@@ -119,7 +119,7 @@ export default function RealStats() {
           <CardContent>
             <div className="text-2xl font-bold">{stats.monthlySales.count}</div>
             <p className="text-xs text-muted-foreground">
-              ${stats.monthlySales.revenue.toLocaleString()} USD
+              {new Intl.NumberFormat('es-CL', { style: 'currency', currency: 'CLP', maximumFractionDigits: 0 }).format(Number(stats.monthlySales.revenue || 0))}
             </p>
           </CardContent>
         </Card>
@@ -130,10 +130,8 @@ export default function RealStats() {
             <DollarSign className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">${stats.totalRevenue.toLocaleString()}</div>
-            <p className="text-xs text-muted-foreground">
-              USD acumulados
-            </p>
+            <div className="text-2xl font-bold">{new Intl.NumberFormat('es-CL', { style: 'currency', currency: 'CLP', maximumFractionDigits: 0 }).format(Number(stats.totalRevenue || 0))}</div>
+            <p className="text-xs text-muted-foreground">CLP acumulados</p>
           </CardContent>
         </Card>
       </div>
@@ -162,7 +160,9 @@ export default function RealStats() {
                   </div>
                   <div className="text-right">
                     <p className="font-medium">{product.sales_count} ventas</p>
-                    <p className="text-sm text-gray-600">${product.total_revenue} USD</p>
+                    <p className="text-sm text-gray-600">
+                      {new Intl.NumberFormat('es-CL', { style: 'currency', currency: 'CLP', maximumFractionDigits: 0 }).format(Number(product.total_revenue || 0))}
+                    </p>
                   </div>
                 </div>
               ))}
@@ -188,7 +188,9 @@ export default function RealStats() {
                     <span className="text-sm text-gray-600">{sector.sales_count} ventas</span>
                   </div>
                   <div className="text-right">
-                    <p className="font-medium">${sector.total_revenue} USD</p>
+                    <p className="font-medium">
+                      {new Intl.NumberFormat('es-CL', { style: 'currency', currency: 'CLP', maximumFractionDigits: 0 }).format(Number(sector.total_revenue || 0))}
+                    </p>
                   </div>
                 </div>
               ))}
@@ -214,7 +216,9 @@ export default function RealStats() {
                     <span className="text-sm text-gray-600">{month.sales_count} ventas</span>
                   </div>
                   <div className="text-right">
-                    <p className="font-medium">${month.total_revenue} USD</p>
+                    <p className="font-medium">
+                      {new Intl.NumberFormat('es-CL', { style: 'currency', currency: 'CLP', maximumFractionDigits: 0 }).format(Number(month.total_revenue || 0))}
+                    </p>
                   </div>
                 </div>
               ))}

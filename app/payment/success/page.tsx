@@ -9,6 +9,7 @@ import { useToast } from '@/hooks/use-toast';
 
 export default function PaymentSuccessPage() {
   const [paymentDetails, setPaymentDetails] = useState<any>(null);
+  const [downloading, setDownloading] = useState(false);
   const { toast } = useToast();
 
   useEffect(() => {
@@ -31,8 +32,14 @@ export default function PaymentSuccessPage() {
 
   const handleDownloadFiles = async () => {
     try {
+      setDownloading(true)
+      const userEmail = typeof window !== 'undefined' ? localStorage.getItem('userEmail') : null
       toast({ title: 'Preparando ZIP', description: 'Generando tus archivos...' })
-      const resp = await fetch('/api/user/download-all', { method: 'POST', headers: { 'Content-Type': 'application/json' } })
+      const resp = await fetch('/api/user/download-all', { 
+        method: 'POST', 
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ userEmail })
+      })
       if (!resp.ok) {
         const err = await resp.json().catch(() => ({}))
         throw new Error(err?.error || 'No fue posible generar el ZIP')
@@ -57,6 +64,8 @@ export default function PaymentSuccessPage() {
         description: "Hubo un problema al descargar los archivos",
         variant: "destructive",
       });
+    } finally {
+      setDownloading(false)
     }
   };
 
@@ -86,12 +95,7 @@ export default function PaymentSuccessPage() {
                     {new Intl.NumberFormat('es-CL', { style: 'currency', currency: 'CLP', maximumFractionDigits: 0 }).format(paymentDetails.amountClp || 0)}
                   </span>
                 </div>
-                <div className="flex justify-between text-xs text-gray-500">
-                  <span>Referencia (USD):</span>
-                  <span>
-                    ${((paymentDetails.amountClp || 0) / 1000).toFixed(2)} USD
-                  </span>
-                </div>
+                {/* Referencia USD removida: el monto de Transbank es CLP oficial */}
                 <div className="flex justify-between text-sm">
                   <span className="font-medium">Orden:</span>
                   <span className="text-xs text-gray-600 truncate">
@@ -112,9 +116,14 @@ export default function PaymentSuccessPage() {
             <Button 
               onClick={handleDownloadFiles}
               className="w-full bg-green-600 hover:bg-green-700 text-sm"
+              disabled={downloading}
             >
-              <Download className="h-4 w-4 mr-2" />
-              Descargar Archivos
+              {downloading ? (
+                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2" />
+              ) : (
+                <Download className="h-4 w-4 mr-2" />
+              )}
+              {downloading ? 'Generando...' : 'Descargar Archivos'}
             </Button>
             
             <Link href="/compras">

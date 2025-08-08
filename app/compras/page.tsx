@@ -6,9 +6,10 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Badge } from '@/components/ui/badge'
-import { Download, Search, Package, ArrowLeft } from 'lucide-react'
+import { Download, Search, Package, ArrowLeft, LayoutGrid, List as ListIcon, Building, Calendar, DollarSign, FileSpreadsheet, Clock, Filter, TrendingUp, Archive, User, Mail } from 'lucide-react'
 import { useToast } from '@/hooks/use-toast'
 import { useRouter } from 'next/navigation'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 
 interface Purchase {
   id: number
@@ -25,8 +26,16 @@ interface Purchase {
 export default function ComprasPage() {
   const [email, setEmail] = useState('')
   const [purchases, setPurchases] = useState<Purchase[]>([])
+  const [filteredPurchases, setFilteredPurchases] = useState<Purchase[]>([])
   const [loading, setLoading] = useState(false)
   const [downloadingAll, setDownloadingAll] = useState(false)
+  const [downloadingId, setDownloadingId] = useState<string | null>(null)
+  const [viewMode, setViewMode] = useState<'list' | 'grid'>('grid')
+  const [currentPage, setCurrentPage] = useState(1)
+  const [searchTerm, setSearchTerm] = useState('')
+  const [selectedSector, setSelectedSector] = useState('all')
+  const [selectedStatus, setSelectedStatus] = useState('all')
+  const pageSize = 12
   const { toast } = useToast()
   const router = useRouter()
 
@@ -40,54 +49,89 @@ export default function ComprasPage() {
     }
   }, [])
 
-  const handleSearchWithEmail = async (userEmail: string) => {
+  // Filtrar compras cuando cambien los filtros
+  useEffect(() => {
+    let filtered = purchases
+
+    // Filtrar por término de búsqueda
+    if (searchTerm) {
+      filtered = filtered.filter(purchase => 
+        purchase.company_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        purchase.sector.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        purchase.description?.toLowerCase().includes(searchTerm.toLowerCase())
+      )
+    }
+
+    // Filtrar por sector
+    if (selectedSector !== 'all') {
+      filtered = filtered.filter(purchase => purchase.sector === selectedSector)
+    }
+
+    // Filtrar por estado
+    if (selectedStatus !== 'all') {
+      filtered = filtered.filter(purchase => purchase.status === selectedStatus)
+    }
+
+    setFilteredPurchases(filtered)
+  }, [purchases, searchTerm, selectedSector, selectedStatus])
+
+  // Obtener sectores únicos
+  const sectors = [...new Set(purchases.map(p => p.sector))].filter(Boolean)
+
+  const handleSearchWithEmail = async (searchEmail: string) => {
+    if (!searchEmail.trim()) {
+      toast({
+        title: "Error",
+        description: "Por favor ingresa tu email",
+        variant: "destructive",
+      })
+      return
+    }
+
     setLoading(true)
     try {
-      const response = await fetch(`/api/user/purchases?userEmail=${encodeURIComponent(userEmail)}`)
+      const response = await fetch(`/api/user/purchases?userEmail=${encodeURIComponent(searchEmail)}`)
+      
+      if (!response.ok) {
+        throw new Error('Error al buscar compras')
+      }
+
       const data = await response.json()
       
       if (data.success) {
-        setPurchases(data.purchases)
-        if (data.purchases.length === 0) {
-          toast({
-            title: "Sin compras",
-            description: "No se encontraron compras para este email"
-          })
-        }
-      } else {
+        setPurchases(data.purchases || [])
+        localStorage.setItem('userEmail', searchEmail)
         toast({
-          title: "Error",
-          description: data.error || "Error al buscar compras",
-          variant: "destructive"
+          title: "Compras encontradas",
+          description: `Se encontraron ${data.purchases?.length || 0} compras`,
+        })
+      } else {
+        setPurchases([])
+        toast({
+          title: "Sin compras",
+          description: "No se encontraron compras para este email",
         })
       }
     } catch (error) {
-      console.error('Error buscando compras:', error)
+      console.error('Error:', error)
       toast({
         title: "Error",
-        description: "No se pudo buscar las compras",
-        variant: "destructive"
+        description: "Error al buscar las compras",
+        variant: "destructive",
       })
     } finally {
       setLoading(false)
     }
   }
 
-  const handleSearch = async () => {
-    if (!email.trim()) {
-      toast({
-        title: "Error",
-        description: "Por favor ingresa tu email",
-        variant: "destructive"
-      })
-      return
-    }
-
-    await handleSearchWithEmail(email)
+  const handleSearch = () => {
+    handleSearchWithEmail(email)
   }
 
   const handleDownload = async (productId: string, companyName: string) => {
     try {
+      setDownloadingId(productId)
+      toast({ title: 'Preparando descarga...', description: companyName })
       const response = await fetch('/api/download-excel', {
         method: 'POST',
         headers: {
@@ -121,17 +165,19 @@ export default function ComprasPage() {
       console.error('Error descargando:', error)
       toast({
         title: "Error",
-        description: "No se pudo descargar el archivo",
+        description: "Hubo un problema durante la descarga",
         variant: "destructive"
       })
+    } finally {
+      setDownloadingId(null)
     }
   }
 
   const handleDownloadAll = async () => {
     if (purchases.length === 0) {
       toast({
-        title: "No hay archivos",
-        description: "No hay archivos para descargar",
+        title: "Sin archivos",
+        description: "No hay compras para descargar",
         variant: "destructive"
       })
       return
@@ -139,8 +185,8 @@ export default function ComprasPage() {
 
     setDownloadingAll(true)
     toast({
-      title: "Generando archivo ZIP",
-      description: `Preparando ${purchases.length} archivo(s)...`
+      title: "Iniciando descarga masiva",
+      description: "Preparando ZIP con todos los archivos..."
     })
 
     try {
@@ -193,153 +239,263 @@ export default function ComprasPage() {
   }
 
   return (
-    <div className="container mx-auto px-4 py-6 md:py-8">
-      <div className="max-w-4xl mx-auto">
-        <div className="text-center mb-6 md:mb-8">
-          <div className="flex items-center justify-between mb-4">
-            <Button
-              variant="ghost"
-              onClick={() => router.push('/')}
-              className="flex items-center gap-2 text-sm"
-            >
-              <ArrowLeft className="h-4 w-4" />
-              <span className="hidden sm:inline">Volver al inicio</span>
-              <span className="sm:hidden">Volver</span>
-            </Button>
-            <div></div> {/* Spacer */}
-          </div>
-          <h1 className="text-2xl md:text-3xl font-bold mb-2">Mis Compras</h1>
-          <p className="text-muted-foreground text-sm md:text-base">
-            Ingresa tu email para ver tus compras y descargar archivos
+    <div className="min-h-screen bg-white">
+      <div className="max-w-6xl mx-auto px-6 py-8">
+        {/* Header simple */}
+        <div className="mb-10">
+          <Button
+            variant="ghost"
+            onClick={() => router.push('/')}
+            className="mb-8 text-gray-600 hover:text-gray-900"
+          >
+            ← Volver
+          </Button>
+          
+          <h1 className="text-3xl font-light text-gray-900 mb-2">
+            Mis Compras
+          </h1>
+          <p className="text-gray-600">
+            Administra tus documentos financieros
           </p>
         </div>
 
-        <Card className="mb-6 md:mb-8">
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2 text-base md:text-lg">
-              <Search className="h-4 w-4 md:h-5 md:w-5" />
-              Buscar Compras
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="flex flex-col sm:flex-row gap-4">
-              <div className="flex-1">
-                <Label htmlFor="email" className="text-sm">Email</Label>
-                <Input
-                  id="email"
-                  type="email"
-                  placeholder="tu@email.com"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  onKeyPress={(e) => e.key === 'Enter' && handleSearch()}
-                  className="text-sm"
-                />
-              </div>
-              <div className="flex items-end">
-                <Button 
-                  onClick={handleSearch} 
-                  disabled={loading}
-                  className="min-w-[120px] text-sm"
-                >
-                  {loading ? (
-                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white" />
-                  ) : (
-                    <Search className="h-4 w-4" />
-                  )}
-                  <span className="ml-2">
-                    {loading ? 'Buscando...' : 'Buscar'}
-                  </span>
-                </Button>
-              </div>
+        {/* Buscador minimalista */}
+        <div className="mb-10">
+          <div className="max-w-md">
+            <label className="block text-sm text-gray-700 mb-2">Email</label>
+            <div className="flex gap-3">
+              <input
+                type="email"
+                placeholder="tu@email.com"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                onKeyPress={(e) => e.key === 'Enter' && handleSearch()}
+                className="flex-1 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:border-blue-500 transition-colors"
+              />
+              <Button 
+                onClick={handleSearch} 
+                disabled={loading}
+                className="px-6 bg-blue-600 text-white hover:bg-blue-700 disabled:bg-gray-400"
+              >
+                {loading ? '...' : 'Buscar'}
+              </Button>
             </div>
-          </CardContent>
-        </Card>
+          </div>
+        </div>
 
+        {/* Estadísticas simples */}
         {purchases.length > 0 && (
-          <div className="space-y-4">
-            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2">
-              <h2 className="text-lg md:text-xl font-semibold">
-                Compras encontradas ({purchases.length})
-              </h2>
-              <div className="flex items-center gap-2">
-                <Badge variant="secondary" className="text-xs">
-                  Total: ${purchases.reduce((sum, p) => sum + p.price, 0).toLocaleString()}
-                </Badge>
-                <Button
-                  onClick={handleDownloadAll}
-                  className="bg-green-600 hover:bg-green-700 text-xs"
-                  size="sm"
-                  disabled={downloadingAll}
-                >
-                  {downloadingAll ? (
-                    <div className="animate-spin rounded-full h-3 w-3 border-b-2 border-white" />
-                  ) : (
-                    <Download className="h-3 w-3 mr-1" />
-                  )}
-                  <span className="ml-1">
-                    {downloadingAll ? 'Generando...' : 'Descargar ZIP'}
-                  </span>
-                </Button>
-              </div>
+          <div className="flex gap-8 mb-10 pb-6 border-b border-gray-200">
+            <div>
+              <div className="text-2xl font-light text-gray-900">{purchases.length}</div>
+              <div className="text-sm text-gray-600">Compras</div>
             </div>
-
-            {purchases.map((purchase) => (
-              <Card key={purchase.id}>
-                <CardContent className="p-4 md:p-6">
-                  <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-                    <div className="flex-1 min-w-0">
-                      <div className="flex flex-col sm:flex-row sm:items-center gap-2 mb-2">
-                        <h3 className="font-semibold text-base md:text-lg truncate">{purchase.company_name}</h3>
-                        <Badge variant={purchase.status === 'completed' ? 'default' : 'secondary'} className="text-xs w-fit">
-                          {purchase.status}
-                        </Badge>
-                      </div>
-                      <p className="text-muted-foreground mb-1 text-sm">
-                        {purchase.sector} • {purchase.year_range}
-                      </p>
-                      {purchase.description && (
-                        <p className="text-sm text-muted-foreground mb-2 line-clamp-2">
-                          {purchase.description}
-                        </p>
-                      )}
-                      <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4 text-sm text-muted-foreground">
-                        <span>Precio: ${purchase.price.toLocaleString()}</span>
-                        <span>
-                          Comprado: {new Date(purchase.created_at).toLocaleDateString()}
-                        </span>
-                      </div>
-                    </div>
-                    <div className="flex items-center gap-2 w-full sm:w-auto">
-                      <Button
-                        onClick={() => handleDownload(purchase.product_id, purchase.company_name)}
-                        variant="outline"
-                        size="sm"
-                        className="text-xs flex-1 sm:flex-none"
-                      >
-                        <Download className="h-3 w-3 mr-1" />
-                        <span className="hidden sm:inline">Descargar</span>
-                        <span className="sm:hidden">Desc</span>
-                      </Button>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-            ))}
+            <div>
+              <div className="text-2xl font-light text-gray-900">
+                ${purchases.reduce((sum, p) => sum + Number(p.price || 0), 0).toLocaleString()}
+              </div>
+              <div className="text-sm text-gray-600">Total</div>
+            </div>
+            <div>
+              <div className="text-2xl font-light text-gray-900">
+                {purchases.filter(p => p.status === 'completed').length}
+              </div>
+              <div className="text-sm text-gray-600">Disponibles</div>
+            </div>
           </div>
         )}
 
+        {/* Filtros simples */}
+        {purchases.length > 0 && (
+          <div className="mb-8">
+            <div className="flex flex-col md:flex-row gap-4 items-start md:items-center justify-between mb-6">
+              <div className="flex gap-4">
+                <input
+                  type="text"
+                  placeholder="Buscar empresa..."
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  className="px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:border-blue-500 w-64"
+                />
+                <select
+                  value={selectedSector}
+                  onChange={(e) => setSelectedSector(e.target.value)}
+                  className="px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:border-blue-500"
+                >
+                  <option value="all">Todos los sectores</option>
+                  {sectors.map(sector => (
+                    <option key={sector} value={sector}>{sector}</option>
+                  ))}
+                </select>
+              </div>
+              
+              <div className="flex gap-2">
+                <button
+                  onClick={() => setViewMode('grid')}
+                  className={`p-2 rounded ${viewMode === 'grid' ? 'bg-blue-100 text-blue-600' : 'text-gray-400 hover:text-gray-600'}`}
+                >
+                  <LayoutGrid className="h-5 w-5" />
+                </button>
+                <button
+                  onClick={() => setViewMode('list')}
+                  className={`p-2 rounded ${viewMode === 'list' ? 'bg-blue-100 text-blue-600' : 'text-gray-400 hover:text-gray-600'}`}
+                >
+                  <ListIcon className="h-5 w-5" />
+                </button>
+                <Button
+                  onClick={handleDownloadAll}
+                  disabled={downloadingAll}
+                  className="ml-4 bg-blue-600 text-white hover:bg-blue-700"
+                >
+                  {downloadingAll ? 'Generando...' : 'Descargar Todo'}
+                </Button>
+              </div>
+            </div>
+
+            <p className="text-sm text-gray-600 mb-8">
+              {filteredPurchases.length} de {purchases.length} compras
+            </p>
+
+            {/* Lista simple */}
+            {(() => {
+              const pageCount = Math.max(1, Math.ceil(filteredPurchases.length / pageSize))
+              const start = (currentPage - 1) * pageSize
+              const end = start + pageSize
+              const pageItems = filteredPurchases.slice(start, end)
+
+              return (
+                <>
+                  {viewMode === 'grid' ? (
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                      {pageItems.map((purchase) => (
+                        <div key={purchase.id} className="border border-gray-200 rounded-lg p-6 hover:border-gray-300 transition-colors">
+                          <div className="flex items-start justify-between mb-4">
+                            <h3 className="font-medium text-gray-900 text-lg">
+                              {purchase.company_name}
+                            </h3>
+                            <span className={`px-2 py-1 text-xs rounded ${
+                              purchase.status === 'completed' 
+                                ? 'bg-green-100 text-green-700' 
+                                : 'bg-yellow-100 text-yellow-700'
+                            }`}>
+                              {purchase.status === 'completed' ? 'Disponible' : 'Pendiente'}
+                            </span>
+                          </div>
+                          
+                          <div className="space-y-2 text-sm text-gray-600 mb-6">
+                            <div>{purchase.sector}</div>
+                            <div>{purchase.year_range}</div>
+                            <div className="font-medium text-gray-900">${purchase.price.toLocaleString()}</div>
+                            <div className="text-xs">{new Date(purchase.created_at).toLocaleDateString()}</div>
+                          </div>
+
+                          <button
+                            onClick={() => handleDownload(purchase.product_id, purchase.company_name)}
+                            disabled={downloadingId === purchase.product_id}
+                            className="w-full px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 disabled:bg-gray-400 transition-colors"
+                          >
+                            {downloadingId === purchase.product_id ? 'Descargando...' : 'Descargar'}
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="space-y-4">
+                      {pageItems.map((purchase) => (
+                        <div key={purchase.id} className="border border-gray-200 rounded-lg p-6 hover:border-gray-300 transition-colors">
+                          <div className="flex items-center justify-between">
+                            <div className="flex-1">
+                              <div className="flex items-center gap-3 mb-2">
+                                <h3 className="font-medium text-gray-900 text-lg">
+                                  {purchase.company_name}
+                                </h3>
+                                <span className={`px-2 py-1 text-xs rounded ${
+                                  purchase.status === 'completed' 
+                                    ? 'bg-green-100 text-green-700' 
+                                    : 'bg-yellow-100 text-yellow-700'
+                                }`}>
+                                  {purchase.status === 'completed' ? 'Disponible' : 'Pendiente'}
+                                </span>
+                              </div>
+                              <div className="flex gap-6 text-sm text-gray-600">
+                                <span>{purchase.sector}</span>
+                                <span>{purchase.year_range}</span>
+                                <span className="font-medium text-gray-900">${purchase.price.toLocaleString()}</span>
+                                <span className="text-xs">{new Date(purchase.created_at).toLocaleDateString()}</span>
+                              </div>
+                            </div>
+                            
+                            <button
+                              onClick={() => handleDownload(purchase.product_id, purchase.company_name)}
+                              disabled={downloadingId === purchase.product_id}
+                              className="px-6 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 disabled:bg-gray-400 transition-colors"
+                            >
+                              {downloadingId === purchase.product_id ? 'Descargando...' : 'Descargar'}
+                            </button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+
+                  {/* Paginación simple */}
+                  {filteredPurchases.length > pageSize && (
+                    <div className="flex items-center justify-center gap-4 mt-10">
+                      <button
+                        disabled={currentPage === 1}
+                        onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                        className="px-4 py-2 text-gray-600 hover:text-gray-900 disabled:text-gray-400 disabled:cursor-not-allowed"
+                      >
+                        ← Anterior
+                      </button>
+                      <span className="text-sm text-gray-600">
+                        {currentPage} de {pageCount}
+                      </span>
+                      <button
+                        disabled={currentPage === pageCount}
+                        onClick={() => setCurrentPage(p => Math.min(pageCount, p + 1))}
+                        className="px-4 py-2 text-gray-600 hover:text-gray-900 disabled:text-gray-400 disabled:cursor-not-allowed"
+                      >
+                        Siguiente →
+                      </button>
+                    </div>
+                  )}
+                </>
+              )
+            })()}
+          </div>
+        )}
+
+        {/* Estado vacío simple */}
         {purchases.length === 0 && !loading && (
-          <Card>
-            <CardContent className="p-8 text-center">
-              <Package className="h-12 w-12 mx-auto mb-4 opacity-50" />
-              <h3 className="text-lg font-medium mb-2">No hay compras</h3>
-              <p className="text-muted-foreground">
-                Ingresa tu email para buscar tus compras o realiza una nueva compra
-              </p>
-            </CardContent>
-          </Card>
+          <div className="text-center py-16">
+            <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
+              <Package className="h-8 w-8 text-gray-400" />
+            </div>
+            <h3 className="text-lg font-medium text-gray-900 mb-2">
+              No hay compras
+            </h3>
+            <p className="text-gray-600 mb-6">
+              Ingresa tu email para buscar tus compras
+            </p>
+            <div className="flex gap-4 justify-center">
+              <Button 
+                onClick={() => router.push('/tienda')}
+                className="bg-blue-600 text-white hover:bg-blue-700"
+              >
+                Ir a la Tienda
+              </Button>
+              <Button 
+                variant="outline"
+                onClick={() => router.push('/perfil')}
+                className="border-gray-300 hover:bg-gray-50"
+              >
+                Mi Perfil
+              </Button>
+            </div>
+          </div>
         )}
       </div>
     </div>
   )
-} 
+}

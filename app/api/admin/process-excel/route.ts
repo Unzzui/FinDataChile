@@ -70,13 +70,13 @@ function determineSector(companyName: string): string {
 
 // Función para calcular precio basado en el rango de años
 function calculatePrice(startYear: number, endYear: number): number {
-  const years = endYear - startYear + 1;
-  
-  if (years === 1) return 2;
-  if (years <= 3) return 2;
-  if (years <= 5) return 3;
-  if (years <= 10) return 3;
-  return 3; // Más de 10 años
+  // Precios en CLP con tope de $2.000
+  const years = endYear - startYear + 1
+  let price = 1000
+  if (years === 1) price = 1000
+  else if (years <= 3) price = 1500
+  else price = 2000
+  return Math.min(2000, Math.max(500, price))
 }
 
 // Función para analizar el contenido del Excel
@@ -207,7 +207,7 @@ export async function POST(request: NextRequest) {
         console.log(`Sector determinado: ${sector}`);
         
         // Calcular precio
-        const price = calculatePrice(startYear, endYear);
+        const price = Math.min(2000, Math.max(500, calculatePrice(startYear, endYear)));
         console.log(`Precio calculado: $${price}`);
         
         // Subir a Vercel Blob en carpeta privada por producto

@@ -363,7 +363,9 @@ export default function PurchaseManager() {
                       <div className="flex items-center gap-2">
                         <span className="font-medium">{purchase.company_name}</span>
                         <Badge variant="secondary">{purchase.sector}</Badge>
-                        <Badge variant="outline">${purchase.price}</Badge>
+                        <Badge variant="outline">
+                          {new Intl.NumberFormat('es-CL', { style: 'currency', currency: 'CLP', maximumFractionDigits: 0 }).format(Number(purchase.price || 0))}
+                        </Badge>
                       </div>
                       <p className="text-sm text-gray-600">{purchase.description}</p>
                       <p className="text-sm text-gray-500">

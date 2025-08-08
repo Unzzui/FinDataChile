@@ -29,10 +29,12 @@ export function RequestCompany({ onRequestSent }: RequestCompanyProps) {
     setIsLoading(true)
 
     try {
-      // Aquí podrías enviar a un endpoint real
-      // Por ahora solo simulamos el envío
-      await new Promise(resolve => setTimeout(resolve, 1000))
-      
+      const resp = await fetch('/api/notifications/request-company', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(formData),
+      })
+      if (!resp.ok) throw new Error('No se pudo enviar la solicitud')
       toast({
         title: "Solicitud enviada",
         description: "Te contactaremos cuando tengamos los datos disponibles",

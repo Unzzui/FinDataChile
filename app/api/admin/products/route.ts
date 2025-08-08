@@ -38,7 +38,7 @@ export async function POST(request: NextRequest) {
         yearRange,
         startYear,
         endYear,
-        price,
+        price, // CLP
         filePath,
         description,
         isActive,

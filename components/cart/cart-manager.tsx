@@ -113,6 +113,7 @@ export function CartManager({ userEmail, onCheckout }: CartManagerProps) {
   }
 
   const totalPrice = cartItems.reduce((sum, item) => sum + item.price, 0)
+  const formatClp = (v: number) => new Intl.NumberFormat('es-CL', { style: 'currency', currency: 'CLP', maximumFractionDigits: 0 }).format(v)
 
   useEffect(() => {
     if (userEmail) {
@@ -170,7 +171,7 @@ export function CartManager({ userEmail, onCheckout }: CartManagerProps) {
                   </p>
                 </div>
                 <div className="flex items-center gap-2">
-                  <span className="font-medium">${item.price.toLocaleString()}</span>
+                  <span className="font-medium">{formatClp(Number(item.price || 0))}</span>
                   <Button
                     variant="ghost"
                     size="sm"
@@ -185,9 +186,7 @@ export function CartManager({ userEmail, onCheckout }: CartManagerProps) {
             <div className="border-t pt-4">
               <div className="flex items-center justify-between mb-4">
                 <span className="font-medium">Total:</span>
-                <span className="font-bold text-lg">
-                  ${totalPrice.toLocaleString()}
-                </span>
+                <span className="font-bold text-lg">{formatClp(totalPrice)}</span>
               </div>
               
               <div className="flex gap-2">

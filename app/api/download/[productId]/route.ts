@@ -4,10 +4,10 @@ import { pgQuery } from '@/lib/pg';
 
 export async function GET(
   request: NextRequest,
-  { params }: { params: { productId: string } }
+  { params }: { params: Promise<{ productId: string }> }
 ) {
   try {
-    const { productId } = params;
+    const { productId } = await params;
     const { searchParams } = new URL(request.url);
     const userEmail = searchParams.get('email');
     const token = searchParams.get('token');
@@ -32,9 +32,9 @@ export async function GET(
       );
     }
 
-    // Obtener información del producto para el nombre del archivo
+    // Obtener información del producto para resolver el file_path real
     const productResult = await pgQuery(
-      'SELECT company_name FROM products WHERE id = $1',
+      'SELECT company_name, file_path FROM products WHERE id = $1',
       [productId]
     );
 
@@ -45,7 +45,7 @@ export async function GET(
       );
     }
 
-    const product = productResult.rows[0];
+    const product = productResult.rows[0] as any;
 
     // Registrar la descarga
     await pgQuery(
@@ -53,9 +53,12 @@ export async function GET(
       [userEmail, productId]
     );
 
-    // Obtener URL de descarga desde Vercel Blob
-    const filename = `${product.company_name.replace(/[^a-zA-Z0-9]/g, '_')}.xlsx`;
-    const downloadUrl = await blobStorage.getDownloadUrl(productId, filename);
+    // Obtener URL de descarga desde Vercel Blob usando el file_path real
+    const originalFileName = String(product.file_path || '').split('/').pop();
+    if (!originalFileName) {
+      return NextResponse.json({ error: 'Archivo no disponible' }, { status: 404 });
+    }
+    const downloadUrl = await blobStorage.getDownloadUrl(productId, originalFileName);
 
     // Redirigir a la URL de descarga de Vercel Blob
     return NextResponse.redirect(downloadUrl);

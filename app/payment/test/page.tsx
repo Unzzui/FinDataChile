@@ -62,7 +62,7 @@ export default function TestPaymentPage() {
                 </div>
                 <div className="flex justify-between">
                   <span>Monto:</span>
-                  <span className="font-bold">$3.00 USD</span>
+                  <span className="font-bold">$3.000 CLP</span>
                 </div>
                 <div className="flex justify-between">
                   <span>Orden:</span>

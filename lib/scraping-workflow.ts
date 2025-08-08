@@ -82,11 +82,11 @@ export async function processRawData(rawDataPath: string, companyName: string): 
       const sheetData = (data as ScrapedData[]).map(item => ({
         'Año': item.year,
         'Trimestre': item.quarter,
-        'Ingresos (USD)': item.revenue.toLocaleString(),
-        'Ingresos Netos (USD)': item.netIncome.toLocaleString(),
-        'Total Activos (USD)': item.totalAssets.toLocaleString(),
-        'Total Pasivos (USD)': item.totalLiabilities.toLocaleString(),
-        'Flujo de Efectivo (USD)': item.cashFlow.toLocaleString(),
+        'Ingresos (CLP)': item.revenue.toLocaleString(),
+        'Ingresos Netos (CLP)': item.netIncome.toLocaleString(),
+        'Total Activos (CLP)': item.totalAssets.toLocaleString(),
+        'Total Pasivos (CLP)': item.totalLiabilities.toLocaleString(),
+        'Flujo de Efectivo (CLP)': item.cashFlow.toLocaleString(),
         'Fuente': item.source,
         'Fecha Scraping': item.scrapedAt.toISOString(),
       }));

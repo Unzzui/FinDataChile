@@ -231,8 +231,8 @@ export const generateExcelFile = (companyId: number, startYear: number, endYear:
   const incomeStatementData = filteredData.map(data => ({
     'Año': data.year,
     'Trimestre': data.quarter,
-    'Ingresos (USD)': data.revenue.toLocaleString(),
-    'Ingresos Netos (USD)': data.netIncome.toLocaleString(),
+    'Ingresos (CLP)': data.revenue.toLocaleString(),
+    'Ingresos Netos (CLP)': data.netIncome.toLocaleString(),
     'Margen Neto (%)': ((data.netIncome / data.revenue) * 100).toFixed(2)
   }));
 
@@ -243,9 +243,9 @@ export const generateExcelFile = (companyId: number, startYear: number, endYear:
   const balanceSheetData = filteredData.map(data => ({
     'Año': data.year,
     'Trimestre': data.quarter,
-    'Total Activos (USD)': data.totalAssets.toLocaleString(),
-    'Total Pasivos (USD)': data.totalLiabilities.toLocaleString(),
-    'Patrimonio Neto (USD)': (data.totalAssets - data.totalLiabilities).toLocaleString(),
+    'Total Activos (CLP)': data.totalAssets.toLocaleString(),
+    'Total Pasivos (CLP)': data.totalLiabilities.toLocaleString(),
+    'Patrimonio Neto (CLP)': (data.totalAssets - data.totalLiabilities).toLocaleString(),
     'Ratio Deuda/Activos': (data.totalLiabilities / data.totalAssets).toFixed(2)
   }));
 
@@ -256,8 +256,8 @@ export const generateExcelFile = (companyId: number, startYear: number, endYear:
   const cashFlowData = filteredData.map(data => ({
     'Año': data.year,
     'Trimestre': data.quarter,
-    'Flujo de Efectivo Operacional (USD)': data.cashFlow.toLocaleString(),
-    'Flujo de Efectivo Libre (USD)': (data.cashFlow * 0.8).toLocaleString(),
+    'Flujo de Efectivo Operacional (CLP)': data.cashFlow.toLocaleString(),
+    'Flujo de Efectivo Libre (CLP)': (data.cashFlow * 0.8).toLocaleString(),
     'Ratio Flujo/Ingresos': ((data.cashFlow / data.revenue) * 100).toFixed(2)
   }));
 
@@ -270,9 +270,9 @@ export const generateExcelFile = (companyId: number, startYear: number, endYear:
     { 'Métrica': 'Sector', 'Valor': company.sector },
     { 'Métrica': 'Período Analizado', 'Valor': `${startYear} - ${endYear}` },
     { 'Métrica': 'Total Registros', 'Valor': filteredData.length },
-    { 'Métrica': 'Promedio Ingresos (USD)', 'Valor': (filteredData.reduce((sum, d) => sum + d.revenue, 0) / filteredData.length).toLocaleString() },
-    { 'Métrica': 'Promedio Activos (USD)', 'Valor': (filteredData.reduce((sum, d) => sum + d.totalAssets, 0) / filteredData.length).toLocaleString() },
-    { 'Métrica': 'Promedio Flujo de Efectivo (USD)', 'Valor': (filteredData.reduce((sum, d) => sum + d.cashFlow, 0) / filteredData.length).toLocaleString() }
+  { 'Métrica': 'Promedio Ingresos (CLP)', 'Valor': (filteredData.reduce((sum, d) => sum + d.revenue, 0) / filteredData.length).toLocaleString() },
+  { 'Métrica': 'Promedio Activos (CLP)', 'Valor': (filteredData.reduce((sum, d) => sum + d.totalAssets, 0) / filteredData.length).toLocaleString() },
+  { 'Métrica': 'Promedio Flujo de Efectivo (CLP)', 'Valor': (filteredData.reduce((sum, d) => sum + d.cashFlow, 0) / filteredData.length).toLocaleString() }
   ];
 
   const summarySheet = XLSX.utils.json_to_sheet(summaryData);

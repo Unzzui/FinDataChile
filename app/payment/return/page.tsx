@@ -17,6 +17,7 @@ function ReturnContent() {
   const { toast } = useToast();
   const [status, setStatus] = useState<PaymentStatus>('processing');
   const [paymentDetails, setPaymentDetails] = useState<any>(null);
+  const [downloading, setDownloading] = useState(false);
 
   useEffect(() => {
     const processPayment = async () => {
@@ -138,12 +139,43 @@ function ReturnContent() {
     processPayment();
   }, [searchParams, toast]);
 
-  const handleDownload = () => {
-    // Implementar descarga de archivos
-    toast({
-      title: "Descarga iniciada",
-      description: "Los archivos se están descargando...",
-    });
+  const handleDownload = async () => {
+    try {
+      setDownloading(true)
+      const userEmail = typeof window !== 'undefined' ? localStorage.getItem('userEmail') : null
+      toast({ title: 'Preparando ZIP', description: 'Generando tus archivos...' })
+      const resp = await fetch('/api/user/download-all', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ userEmail })
+      })
+      if (!resp.ok) {
+        const err = await resp.json().catch(() => ({}))
+        throw new Error(err?.error || 'No fue posible generar el ZIP')
+      }
+      const blob = await resp.blob()
+      const url = window.URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      const cd = resp.headers.get('content-disposition') || ''
+      const match = cd.match(/filename="(.+)"/)
+      const filename = match?.[1] || 'Compras_FinData_Chile.zip'
+      a.href = url
+      a.download = filename
+      document.body.appendChild(a)
+      a.click()
+      window.URL.revokeObjectURL(url)
+      document.body.removeChild(a)
+      toast({ title: 'ZIP descargado', description: 'Tus archivos fueron descargados en un ZIP' })
+    } catch (error) {
+      console.error('Error descargando archivos:', error);
+      toast({
+        title: "Error en la descarga",
+        description: "Hubo un problema al descargar los archivos",
+        variant: "destructive",
+      });
+    } finally {
+      setDownloading(false)
+    }
   };
 
   const handleGoHome = () => {
@@ -204,12 +236,7 @@ function ReturnContent() {
                     {new Intl.NumberFormat('es-CL', { style: 'currency', currency: 'CLP', maximumFractionDigits: 0 }).format(paymentDetails.amountClp || 0)}
                   </span>
                 </div>
-                <div className="flex justify-between text-xs text-gray-500">
-                  <span>Referencia (USD):</span>
-                  <span>
-                    ${((paymentDetails.amountClp || 0) / 1000).toFixed(2)} USD
-                  </span>
-                </div>
+                {/* Referencia USD removida: el monto de Transbank es CLP oficial */}
                 <div className="flex justify-between text-sm">
                   <span className="font-medium">Orden:</span>
                   <span className="text-xs text-gray-600 truncate">
@@ -247,8 +274,12 @@ function ReturnContent() {
               <Button 
                 onClick={handleDownload}
                 className="w-full bg-green-600 hover:bg-green-700 text-sm"
+                disabled={downloading}
               >
-                Descargar Archivos
+                {downloading ? (
+                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2" />
+                ) : null}
+                {downloading ? 'Generando...' : 'Descargar Archivos'}
               </Button>
             )}
             

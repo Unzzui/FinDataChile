@@ -2,41 +2,27 @@
 
 import { useState, useMemo, useEffect } from "react"
 import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
-import { Badge } from "@/components/ui/badge"
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from "@/components/ui/dialog"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Separator } from "@/components/ui/separator"
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import {
-  CheckCircle,
-  FileSpreadsheet,
   Search,
   ShoppingCart,
-  X,
-  CreditCard,
   Building2,
-  Calendar,
-  Filter,
-  TrendingUp,
-  Clock,
   Download,
   User,
+  X,
+  CreditCard,
+  Check,
 } from "lucide-react"
 import Link from "next/link"
 import { useToast } from "@/hooks/use-toast"
 import { usePayment } from "@/hooks/use-payment"
 import { RequestCompany } from "@/components/request-company"
-import { AddToCartButton } from "@/components/cart/add-to-cart-button"
-import { CartManager } from "@/components/cart/cart-manager"
+import { clasificador } from '@/lib/clasificador-empresas'
+// (El CartManager no se usa aquí)
 import { DownloadButton } from "@/components/download-button"
+import React from "react"
 // Función para cargar productos desde la API
 async function loadProductsFromAPI() {
   try {
@@ -66,17 +52,38 @@ interface CartItem {
   price: number;
 }
 
+// Skeleton simple para tarjetas (mejora de percepción de carga)
+function SkeletonCard() {
+  return (
+    <div className="animate-pulse rounded-xl border border-gray-200 bg-white p-4 space-y-4 shadow-sm">
+      <div className="h-4 bg-gray-200 rounded w-2/3" />
+      <div className="flex gap-2">
+        <div className="h-4 bg-gray-200 w-16 rounded" />
+        <div className="h-4 bg-gray-200 w-12 rounded" />
+        <div className="h-4 bg-gray-200 w-14 rounded" />
+      </div>
+      <div className="space-y-2">
+        <div className="h-3 bg-gray-200 w-full rounded" />
+        <div className="h-3 bg-gray-200 w-5/6 rounded" />
+        <div className="h-3 bg-gray-200 w-4/6 rounded" />
+      </div>
+      <div className="h-8 bg-gray-200 rounded" />
+    </div>
+  )
+}
+
 export default function Component() {
   const [searchTerm, setSearchTerm] = useState("")
   const [selectedSector, setSelectedSector] = useState("todos")
   const [selectedYearRange, setSelectedYearRange] = useState("todos")
   const [sortBy, setSortBy] = useState("relevance")
   const [cart, setCart] = useState<CartItem[]>([])
-  const [isCheckoutOpen, setIsCheckoutOpen] = useState(false)
+  const [isCartDialogOpen, setIsCartDialogOpen] = useState(false)
   const [products, setProducts] = useState<any[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [userEmail, setUserEmail] = useState("")
   const [showEmailDialog, setShowEmailDialog] = useState(false)
+  const [usdToClpRate, setUsdToClpRate] = useState(1)
 
   // Función para cargar el carrito desde la base de datos
   const loadCartFromDB = async () => {
@@ -103,6 +110,15 @@ export default function Component() {
     }
   }
 
+  const [addedToCartId, setAddedToCartId] = useState<string | null>(null)
+
+  // Función mejorada para verificar si una empresa es popular usando la base de datos completa
+  const isEmpresaPopular = (companyName: string) => {
+    const clasificacion = clasificador.clasificarEmpresa(companyName + '_EEFF.xlsx')
+    // Una empresa es popular si tiene alta confianza en la clasificación (está en nuestra BD)
+    return clasificacion.confianza > 0.8
+  }
+
   // Función optimizada para agregar al carrito sin recargar todo
   const addToCartOptimized = async (product: typeof products[0]) => {
     try {
@@ -121,27 +137,40 @@ export default function Component() {
       })
 
       if (response.ok) {
-        // Agregar directamente al estado local sin recargar
-        const newItem: CartItem = {
-          productId: product.id,
-          productName: product.description,
-          companyName: product.companyName,
-          sector: product.sector,
-          yearRange: product.yearRange,
-          price: product.price,
+        const data = await response.json()
+        
+        // Solo proceder si realmente se agregó algo nuevo
+        if (data.success && !data.alreadyExists) {
+          // Agregar directamente al estado local sin recargar
+          const newItem: CartItem = {
+            productId: product.id,
+            productName: product.description,
+            companyName: product.companyName,
+            sector: product.sector,
+            yearRange: product.yearRange,
+            price: product.price,
+          }
+          setCart((prev) => [...prev, newItem])
+          // Notificar al widget del navbar
+          if (typeof window !== 'undefined') {
+            window.dispatchEvent(new CustomEvent('cart:updated'))
+          }
+          
+          // Feedback visual sutil en el botón
+          setAddedToCartId(product.id)
+          setTimeout(() => setAddedToCartId(null), 2000)
+        } else if (data.alreadyExists) {
+          // Producto ya estaba en el carrito, mostrar mensaje diferente
+          toast({
+            title: "Ya en el carrito",
+            description: `${product.companyName} ya está en tu carrito`,
+            variant: "default",
+          })
         }
-        setCart((prev) => [...prev, newItem])
-        // Notificar al widget del navbar
-        if (typeof window !== 'undefined') {
-          window.dispatchEvent(new CustomEvent('cart:updated'))
-        }
-        toast({
-          title: "Agregado al carrito",
-          description: `${product.companyName} agregado correctamente`,
-        })
       }
     } catch (error) {
       console.error('Error agregando al carrito:', error)
+      // Solo mostrar toast para errores
       toast({
         title: "Error",
         description: "No se pudo agregar al carrito",
@@ -164,6 +193,11 @@ export default function Component() {
   useEffect(() => {
     loadCartFromDB()
   }, [userEmail])
+
+  // Cargar tipo de cambio CLP referencial
+  useEffect(() => {
+    setUsdToClpRate(1)
+  }, [])
 
   // Guardar email en localStorage
   const saveUserEmail = (email: string) => {
@@ -287,222 +321,244 @@ export default function Component() {
 
 
 
-  const totalCart = cart.reduce((sum, item) => sum + item.price, 0)
+  const totalCart = useMemo(() => cart.reduce((sum, item) => sum + Number(item.price || 0), 0), [cart])
+  const totalClp = useMemo(() => Math.round(totalCart), [totalCart])
+  const formatClp = (v: number) => new Intl.NumberFormat('es-CL', { style: 'currency', currency: 'CLP', maximumFractionDigits: 0 }).format(v)
 
   const getSectorColor = (sector: string) => {
-    const colors: { [key: string]: string } = {
-      Bancario: "bg-blue-100 text-blue-800",
-      Retail: "bg-purple-100 text-purple-800",
-      Minería: "bg-orange-100 text-orange-800",
-      Energía: "bg-green-100 text-green-800",
-      Telecomunicaciones: "bg-cyan-100 text-cyan-800",
-      AFP: "bg-indigo-100 text-indigo-800",
-      Salud: "bg-red-100 text-red-800",
-      Transporte: "bg-yellow-100 text-yellow-800",
-      Consumo: "bg-pink-100 text-pink-800",
-      Inmobiliario: "bg-teal-100 text-teal-800",
-    }
-    return colors[sector] || "bg-gray-100 text-gray-800"
+    return "bg-slate-100 text-slate-800 border border-slate-200"
   }
 
   return (
-    <div className="flex flex-col min-h-screen bg-white">
-      {/* Cart en navbar: ahora gestionado por SiteHeader -> CartWidget */}
-
+    <div className="min-h-screen bg-white">
       <main className="flex-1">
-        {/* Hero Section */}
-        <section className="w-full py-12 bg-gradient-to-br from-green-50 to-blue-50">
-          <div className="container mx-auto px-4 md:px-6">
-            <div className="text-center max-w-4xl mx-auto space-y-6">
-              <h1 className="text-3xl md:text-4xl font-bold tracking-tight text-gray-900">
-                Estados Financieros Históricos
-                <span className="text-green-600 block mt-1">Datos Reales de la CMF</span>
+        {/* Header simple */}
+        <section className="w-full py-12 bg-white">
+          <div className="max-w-6xl mx-auto px-6">
+            <div className="text-center space-y-4">
+              <h1 className="text-3xl font-light text-gray-900">
+                Catálogo de Empresas
               </h1>
-              <p className="text-lg text-gray-700">
-                Ahorra horas. Descarga al instante. Archivos Excel listos para analizar.
+              <p className="text-lg font-light text-gray-600">
+                Selecciona las empresas que necesitas
               </p>
-
-              <div className="flex flex-wrap justify-center gap-4 pt-4">
-                <div className="flex items-center gap-2 text-sm text-gray-600">
-                  <TrendingUp className="h-4 w-4 text-green-500" />
-                  <span>Datos reales CMF</span>
-                </div>
-                <div className="flex items-center gap-2 text-sm text-gray-600">
-                  <CheckCircle className="h-4 w-4 text-purple-500" />
-                  <span>Descarga instantánea</span>
-                </div>
-                <div className="flex items-center gap-2 text-sm text-gray-600">
-                  <Clock className="h-4 w-4 text-blue-500" />
-                  <span>Actualizaciones regulares</span>
-                </div>
-              </div>
             </div>
           </div>
         </section>
 
-        {/* Filtros y Búsqueda */}
-        <section className="w-full py-4 md:py-8 bg-white border-b">
-          <div className="container mx-auto px-4 md:px-6">
-            <div className="flex flex-col gap-4">
+        {/* Búsqueda y filtros minimalistas */}
+        <section className="w-full py-8 bg-gray-50 border-y border-gray-200">
+          <div className="max-w-6xl mx-auto px-6">
+            <div className="flex flex-col gap-6">
               {/* Búsqueda principal */}
               <div className="flex flex-col sm:flex-row gap-4 items-center justify-between">
-                <div className="relative flex-1 w-full">
-                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
-                  <Input
+                <div className="relative flex-1 max-w-md">
+                  <input
+                    type="text"
                     placeholder="Buscar empresa..."
                     value={searchTerm}
                     onChange={(e) => setSearchTerm(e.target.value)}
-                    className="pl-10 w-full"
+                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:border-blue-500 transition-colors"
                   />
                 </div>
 
-                <div className="text-sm text-gray-500 text-center sm:text-left">
-                  {isLoading ? "Cargando productos..." : `${filteredProducts.length} producto(s) encontrado(s)`}
+                <div className="text-sm text-gray-500">
+                  {isLoading ? "Cargando..." : `${filteredProducts.length} empresas`}
                 </div>
               </div>
 
-              {/* Filtros */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3 md:gap-4">
-                <Select value={selectedSector} onValueChange={setSelectedSector}>
-                  <SelectTrigger className="text-sm">
-                    <Filter className="h-4 w-4 mr-2" />
-                    <SelectValue placeholder="Sector" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="todos">Todos los sectores</SelectItem>
-                    {sectores.map((sector) => (
-                      <SelectItem key={sector} value={sector}>
-                        {sector}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-
-                <Select value={selectedYearRange} onValueChange={setSelectedYearRange}>
-                  <SelectTrigger className="text-sm">
-                    <Calendar className="h-4 w-4 mr-2" />
-                    <SelectValue placeholder="Años" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="todos">Todos los años</SelectItem>
-                    {yearRanges.map((yearRange) => (
-                      <SelectItem key={yearRange} value={yearRange}>
-                        {yearRange}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-
-                <Select value={sortBy} onValueChange={setSortBy}>
-                  <SelectTrigger className="text-sm">
-                    <SelectValue placeholder="Ordenar" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="relevance">Relevancia</SelectItem>
-                    <SelectItem value="name">Nombre (A-Z)</SelectItem>
-                    <SelectItem value="priceLow">Precio (menor a mayor)</SelectItem>
-                    <SelectItem value="priceHigh">Precio (mayor a menor)</SelectItem>
-                    <SelectItem value="yearNew">Año más reciente</SelectItem>
-                  </SelectContent>
-                </Select>
-
-                <Button
-                  variant="outline"
-                  onClick={() => {
-                    setSearchTerm("")
-                    setSelectedSector("todos")
-                    setSelectedYearRange("todos")
-                  }}
-                  className="flex items-center gap-2 text-sm"
+              {/* Filtros simples */}
+              <div className="flex flex-wrap gap-4">
+                <select
+                  value={selectedSector}
+                  onChange={(e) => setSelectedSector(e.target.value)}
+                  className="px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:border-blue-500 bg-white"
                 >
-                  <X className="h-4 w-4" />
-                  <span className="hidden sm:inline">Limpiar</span>
-                  <span className="sm:hidden">Reset</span>
-                </Button>
+                  <option value="todos">Todos los sectores</option>
+                  {sectores.map((sector) => (
+                    <option key={sector} value={sector}>
+                      {sector}
+                    </option>
+                  ))}
+                </select>
+
+                <select
+                  value={selectedYearRange}
+                  onChange={(e) => setSelectedYearRange(e.target.value)}
+                  className="px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:border-blue-500 bg-white"
+                >
+                  <option value="todos">Todos los años</option>
+                  {yearRanges.map((range) => (
+                    <option key={range} value={range}>
+                      {range}
+                    </option>
+                  ))}
+                </select>
+
+                <select
+                  value={sortBy}
+                  onChange={(e) => setSortBy(e.target.value)}
+                  className="px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:border-blue-500 bg-white"
+                >
+                  <option value="relevance">Relevancia</option>
+                  <option value="company">Empresa A-Z</option>
+                  <option value="sector">Sector</option>
+                  <option value="price-low">Precio: Menor a Mayor</option>
+                  <option value="price-high">Precio: Mayor a Menor</option>
+                </select>
               </div>
             </div>
           </div>
         </section>
 
-        {/* Catálogo de Productos */}
-        <section className="w-full py-8 md:py-12 bg-gray-50">
-          <div className="container mx-auto px-4 md:px-6">
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-6">
-              {isLoading ? (
-                <div className="col-span-full text-center py-12">
-                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-4"></div>
-                  <p className="text-gray-600">Cargando productos...</p>
+        {/* Catálogo con wow factor */}
+        <section className="w-full py-12 bg-white">
+          <div className="max-w-6xl mx-auto px-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+              {isLoading && Array.from({ length: 9 }).map((_, i) => (
+                <div key={`s-${i}`} className="border border-gray-200 rounded-lg p-6 animate-pulse">
+                  <div className="h-4 bg-gray-200 rounded w-3/4 mb-3"></div>
+                  <div className="h-3 bg-gray-200 rounded w-1/2 mb-4"></div>
+                  <div className="h-20 bg-gray-200 rounded mb-4"></div>
+                  <div className="h-10 bg-gray-200 rounded"></div>
                 </div>
-              ) : (
-                filteredProducts.map((product) => (
-                  <Card key={product.id} className="hover:shadow-lg transition-all border-2 hover:border-green-200">
-                    <CardHeader className="pb-3">
-                      <div className="flex items-start justify-between">
-                        <div className="flex-1">
-                          <CardTitle className="text-base md:text-lg flex items-center gap-2">
-                            <Building2 className="h-4 w-4 md:h-5 md:w-5 text-gray-600" />
-                            <span className="truncate">{product.companyName}</span>
-                          </CardTitle>
-                          <div className="flex flex-wrap items-center gap-1 md:gap-2 mt-2">
-                            <Badge className={`text-xs ${getSectorColor(product.sector)}`}>{product.sector}</Badge>
-                            <Badge variant="outline" className="text-xs">
-                              {product.yearRange}
-                            </Badge>
-                            <Badge variant="outline" className={`text-xs ${product.isQuarterly ? 'bg-blue-50 text-blue-700' : 'bg-green-50 text-green-700'}`}>
-                              {product.isQuarterly ? 'Trimestral' : 'Anual'}
-                            </Badge>
+              ))}
+              
+              {!isLoading && filteredProducts.length === 0 && (
+                <div className="col-span-full text-center py-16">
+                  <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                    <Search className="h-8 w-8 text-gray-400" />
+                  </div>
+                  <h3 className="text-lg font-medium text-gray-900 mb-2">Sin resultados</h3>
+                  <p className="text-gray-600 mb-6">
+                    No encontramos empresas con esos criterios
+                  </p>
+                  <button
+                    onClick={() => { setSearchTerm(""); setSelectedSector("todos"); setSelectedYearRange("todos"); }}
+                    className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors"
+                  >
+                    Limpiar filtros
+                  </button>
+                </div>
+              )}
+              
+              {!isLoading && filteredProducts.length > 0 && (
+                filteredProducts.map((product, index) => (
+                  <div key={product.id} className="group border border-gray-200 rounded-lg p-6 hover:shadow-lg hover:border-blue-300 transition-all bg-white">
+                    
+                    {/* Badge inteligente de popularidad */}
+                    {isEmpresaPopular(product.companyName) && (
+                      <div className="inline-block bg-blue-100 text-blue-800 text-xs px-3 py-1 rounded-full font-medium mb-4">
+                        Popular
+                      </div>
+                    )}
+
+                    <div className="mb-4">
+                      <h3 className="text-lg font-medium text-gray-900 group-hover:text-blue-600 transition-colors mb-3">
+                        {product.companyName}
+                      </h3>
+                      
+                      <div className="flex flex-wrap gap-2 mb-4">
+                        <span className="px-3 py-1 text-xs bg-blue-50 text-blue-700 rounded-full border border-blue-200">
+                          {product.sector}
+                        </span>
+                        <span className="px-3 py-1 text-xs bg-gray-50 text-gray-700 rounded-full border border-gray-200">
+                          {product.yearRange}
+                        </span>
+                        <span className="px-3 py-1 text-xs bg-green-50 text-emerald-700 rounded-full border border-emerald-200">
+                          {product.isQuarterly ? 'Trimestral' : 'Anual'}
+                        </span>
+                      </div>
+                      
+                      <p className="text-sm text-gray-600 leading-relaxed line-clamp-3 mb-4">
+                        {product.description}
+                      </p>
+
+                      {/* Beneficios limpios */}
+                      <div className="space-y-2 mb-4">
+                        <div className="flex items-center gap-2 text-xs text-gray-600">
+                          <div className="w-1.5 h-1.5 bg-green-500 rounded-full"></div>
+                          <span>Datos oficiales CMF</span>
+                        </div>
+                        <div className="flex items-center gap-2 text-xs text-gray-600">
+                          <div className="w-1.5 h-1.5 bg-blue-500 rounded-full"></div>
+                          <span>Formato Excel</span>
+                        </div>
+                        <div className="flex items-center gap-2 text-xs text-gray-600">
+                          <div className="w-1.5 h-1.5 bg-purple-500 rounded-full"></div>
+                          <span>3 estados financieros</span>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="border-t border-gray-100 pt-4">
+                      <div className="bg-gray-50 rounded-lg p-4 mb-4">
+                        <div className="flex items-center justify-between mb-3">
+                          <div>
+                            <div className="text-sm font-medium text-gray-900">
+                              {product.isQuarterly ? 'Estados Trimestrales' : 'Estados Anuales'}
+                            </div>
+                            <div className="text-xs text-gray-600">
+                              Balance + Resultados + Flujos
+                            </div>
+                          </div>
+                          <div className="text-right">
+                            <div className="text-xl font-medium text-gray-900">
+                              {formatClp(Number(product.price || 0))}
+                            </div>
+                            <div className="text-xs text-gray-500">
+                              Por empresa
+                            </div>
                           </div>
                         </div>
                       </div>
-                    </CardHeader>
 
-                    <CardContent className="space-y-4">
-                      <div>
-                        <p className="text-sm text-gray-700 mb-3 line-clamp-2 leading-relaxed">{product.description}</p>
-                        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between p-3 border rounded-lg gap-3 bg-white">
-                          <div className="flex-1">
-                            <div className="flex items-center gap-2">
-                              <span className="font-medium text-sm">
-                                {product.isQuarterly ? 'Estados Trimestrales' : 'Estados Anuales'}
-                              </span>
-                            </div>
-                            <p className="text-xs text-gray-500">Balance + Resultados + Flujos</p>
-                          </div>
-                          <div className="flex items-center gap-2 w-full sm:w-auto">
-                            <span className="font-extrabold text-green-700 text-base md:text-lg">${Number(product.price).toFixed(2)} USD</span>
-                            <div className="flex gap-1">
-                              <Button
-                                onClick={() => addToCartOptimized(product)}
-                                className="bg-green-600 hover:bg-green-700 text-white text-xs px-3 py-1 h-8"
-                              >
-                                <span className="hidden sm:inline">Agregar al carrito</span>
-                                <span className="sm:hidden">+</span>
-                              </Button>
-                              <DownloadButton
-                                productId={product.id}
-                                userEmail={userEmail}
-                                size="sm"
-                                className="text-xs px-3 py-1 h-8"
-                              />
-                            </div>
-                          </div>
+                      <div className="flex gap-3">
+                        <button
+                          onClick={() => addToCartOptimized(product)}
+                          className={`flex-1 px-4 py-3 rounded-lg transition-all flex items-center justify-center gap-2 font-medium ${
+                            addedToCartId === product.id 
+                              ? 'bg-green-600 text-white' 
+                              : 'bg-blue-600 text-white hover:bg-blue-700'
+                          }`}
+                        >
+                          {addedToCartId === product.id ? (
+                            <>
+                              <Check className="h-4 w-4" />
+                              <span>Agregado</span>
+                            </>
+                          ) : (
+                            <>
+                              <ShoppingCart className="h-4 w-4" />
+                              <span>Agregar al carrito</span>
+                            </>
+                          )}
+                        </button>
+                        <DownloadButton
+                          productId={product.id}
+                          userEmail={userEmail}
+                          className="px-4 py-3 border border-gray-300 rounded-lg hover:border-blue-400 hover:bg-blue-50 transition-colors"
+                        />
+                      </div>
+                      
+                      {/* Línea de confianza simple */}
+                      <div className="mt-3 text-center">
+                        <div className="text-xs text-gray-500">
+                          Datos verificados • Formato Excel • Entrega inmediata
                         </div>
                       </div>
-
-                      <div className="flex items-center justify-center pt-2 border-t text-xs text-gray-500">
-                        <CheckCircle className="h-3 w-3 mr-1" />
-                        Datos oficiales de la CMF
-                      </div>
-                    </CardContent>
-                  </Card>
+                    </div>
+                  </div>
                 ))
               )}
             </div>
+          </div>
+        </section>
 
-            {/* Sección de solicitud de empresas */}
-            <div className="mt-8 md:mt-12">
-              <RequestCompany />
-            </div>
+        {/* Sección de solicitud de empresas */}
+        <section className="w-full py-12 bg-gray-50">
+          <div className="max-w-6xl mx-auto px-6">
+            <RequestCompany />
           </div>
         </section>
       </main>
@@ -511,7 +567,7 @@ export default function Component() {
 
       {/* Carrito Flotante */}
       {cart.length > 0 && (
-        <div className="fixed bottom-4 right-4 z-50">
+    <div className="fixed bottom-4 right-4 z-50 mb-[env(safe-area-inset-bottom)] mr-[env(safe-area-inset-right)]">
           <Button
             onClick={() => {
               // Verificar si hay email, si no, pedirlo
@@ -519,16 +575,98 @@ export default function Component() {
                 setShowEmailDialog(true)
                 return
               }
-              setIsCheckoutOpen(true)
+              // Ir a página dedicada de carrito
+              window.location.href = '/carrito'
             }}
-            className="bg-green-600 hover:bg-green-700 shadow-lg"
-            size="lg"
+      className="bg-white text-slate-800 border border-slate-200 hover:bg-slate-50 shadow-lg rounded-full backdrop-blur-md px-4 py-2 md:px-6 md:py-3"
           >
-            <ShoppingCart className="h-5 w-5 mr-2" />
-            {cart.length} archivo(s) - ${totalCart} USD
+            <ShoppingCart className="h-5 w-5 mr-2 text-blue-700" />
+            <span className="sm:hidden font-semibold">{cart.length} · {formatClp(totalCart)}</span>
+            <span className="hidden sm:inline font-semibold">{cart.length} archivo(s) · {formatClp(totalCart)} · Ver carrito y pagar</span>
           </Button>
         </div>
       )}
+
+      {/* Modal centrado del carrito */}
+      <Dialog open={isCartDialogOpen} onOpenChange={setIsCartDialogOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Tu Carrito</DialogTitle>
+            <DialogDescription>
+              {cart.length === 0 ? "Tu carrito está vacío" : `${cart.length} archivo(s) seleccionado(s)`}
+            </DialogDescription>
+          </DialogHeader>
+
+          {cart.length > 0 ? (
+            <div className="space-y-4">
+              <div className="max-h-60 overflow-y-auto space-y-2">
+                {cart.map((item) => (
+                  <div key={item.productId} className="flex items-center justify-between p-3 bg-slate-50 rounded-lg">
+                    <div className="flex-1 min-w-0">
+                      <p className="font-medium text-sm truncate text-slate-800">{item.companyName}</p>
+                      <p className="text-xs text-slate-500">{item.yearRange} • {item.sector}</p>
+                    </div>
+                    <div className="flex items-center gap-2 ml-2">
+                      <span className="font-semibold text-sm">{formatClp(Number(item.price || 0))}</span>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => removeFromCart(item.productId)}
+                        className="h-6 w-6 p-0 text-red-500 hover:text-red-700"
+                        aria-label="Eliminar del carrito"
+                      >
+                        <X className="h-3 w-3" />
+                      </Button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              <Separator />
+
+              <div className="space-y-1">
+                <div className="flex justify-between items-center font-semibold text-sm text-slate-800">
+                  <span>Total:</span>
+                  <span>{formatClp(totalClp)}</span>
+                </div>
+                <p className="text-xs text-slate-500 text-right">Compra 100% segura con Transbank</p>
+              </div>
+
+              <Button
+                className="w-full bg-blue-600 hover:bg-blue-700"
+                onClick={async () => {
+                  if (cart.length === 0) return
+                  if (!userEmail || userEmail.trim() === '') {
+                    setShowEmailDialog(true)
+                    return
+                  }
+                  try {
+                    await initiatePayment({
+                      productIds: cart.map(c => c.productId),
+                      customerEmail: userEmail,
+                      customerName: "Usuario",
+                    })
+                  } catch (e) {}
+                }}
+                disabled={isProcessing}
+              >
+                {isProcessing ? (
+                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                ) : (
+                  <CreditCard className="h-4 w-4 mr-2" />
+                )}
+                Pagar con WebPay
+              </Button>
+              <p className="text-xs text-slate-500 text-center">Entrega inmediata por email</p>
+            </div>
+          ) : (
+            <div className="text-center py-8">
+              <ShoppingCart className="h-12 w-12 text-slate-300 mx-auto mb-4" />
+              <p className="text-slate-500">Agrega archivos a tu carrito para comenzar</p>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
 
 
 

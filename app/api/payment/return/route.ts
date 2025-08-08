@@ -1,6 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createWebpayPlusTransaction, transbankConfig } from '@/lib/transbank-config';
 import { createPurchase, clearCart } from '@/lib/database';
+import { sendPurchaseLinksEmail } from '@/lib/email'
+import { createUserToken } from '@/lib/user-auth'
+import { blobStorage } from '@/lib/vercel-blob-storage'
 import { pgQuery } from '@/lib/pg';
 
 export async function POST(request: NextRequest) {
@@ -96,6 +99,28 @@ export async function POST(request: NextRequest) {
           }
           
           console.log('Compra registrada exitosamente');
+
+          // Enviar correo de forma no bloqueante con enlaces de descarga
+          ;(async () => {
+            try {
+              const links: { companyName: string; url: string }[] = []
+              const origin = new URL(request.url).origin
+              const token = createUserToken({ sub: String(tx.id || email), email })
+              for (const pid of itemsToProcess) {
+                const { rows } = await pgQuery('SELECT company_name, file_path FROM products WHERE id = $1', [pid])
+                const pr = rows[0] as any
+                if (!pr?.file_path) continue
+                // Enviar enlace a nuestra API que valida compra y genera URL firmada
+                const apiUrl = `${origin}/api/download/${encodeURIComponent(pid)}?email=${encodeURIComponent(email)}&token=${encodeURIComponent(token)}`
+                links.push({ companyName: pr.company_name, url: apiUrl })
+              }
+              if (links.length) {
+                await sendPurchaseLinksEmail(email, links, { amountClp: Number(tx.total_amount || 0), buyOrder: tx.id })
+              }
+            } catch (mailError) {
+              console.warn('No se pudo enviar correo de compra:', mailError)
+            }
+          })()
           
           return NextResponse.json({
             success: true,
@@ -107,16 +132,12 @@ export async function POST(request: NextRequest) {
           });
         } catch (error) {
           console.error('Error registrando compra:', error);
-          
-          // Convertir de CLP a USD (aproximadamente 1000 CLP = 1 USD)
-          const clpToUsdRate = 1000;
-          const amountInUsd = Math.round((commitResponse.amount || 0) / clpToUsdRate);
-          
+          // Fallback: mantener monto en CLP
           return NextResponse.json({
             success: true,
             status: 'authorized',
             message: 'Pago procesado exitosamente',
-            amount: amountInUsd,
+            amount: commitResponse.amount,
             buyOrder: commitResponse.buy_order || tbk_buy_order,
             redirectUrl: '/payment/success'
           });

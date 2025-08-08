@@ -76,12 +76,12 @@ export function DownloadButton({ productId, userEmail, size = 'sm', className = 
       size={size}
       onClick={handleDownload}
       disabled={isDownloading}
-      className={`bg-blue-600 hover:bg-blue-700 text-white ${className}`}
+      className={`bg-white text-blue-700 border border-blue-200 hover:bg-blue-50 ${className}`}
     >
       {isDownloading ? (
         <div className="animate-spin rounded-full h-3 w-3 border-b-2 border-white"></div>
       ) : (
-        <Download className="h-3 w-3" />
+        <Download className="h-3 w-3 text-blue-700" />
       )}
     </Button>
   );

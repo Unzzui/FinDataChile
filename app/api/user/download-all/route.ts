@@ -1,16 +1,19 @@
 import { NextRequest, NextResponse } from 'next/server';
 // removed getDatabase (SQLite). All data comes from Postgres helpers
 import { verifyUserToken } from '@/lib/user-auth';
-import { promises as fs } from 'fs';
-import path from 'path';
 import archiver from 'archiver';
+import { PassThrough } from 'stream';
 import { blobStorage } from '@/lib/vercel-blob-storage';
+
+export const runtime = 'nodejs';
 
 export async function POST(request: NextRequest) {
   try {
     const token = request.cookies.get('userToken')?.value
     const payload = verifyUserToken(token)
-    const userEmail = payload?.email
+    const body = await request.json().catch(() => ({} as any))
+    const providedEmail = body?.userEmail
+    const userEmail = payload?.email || providedEmail
     if (!userEmail) {
       return NextResponse.json({ error: 'No autenticado' }, { status: 401 })
     }
@@ -25,16 +28,13 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Crear archivo ZIP
-    const archive = archiver('zip', {
-      zlib: { level: 9 } // Máxima compresión
-    });
-
-    // Crear stream para el ZIP
+    // Crear archivo ZIP via stream a memoria
+    const archive = archiver('zip', { zlib: { level: 9 } });
+    const pass = new PassThrough();
     const chunks: Buffer[] = [];
-    archive.on('data', (chunk: Buffer) => {
-      chunks.push(chunk);
-    });
+    pass.on('data', (chunk: Buffer) => chunks.push(chunk));
+    archive.on('error', (err) => { throw err });
+    archive.pipe(pass);
 
     // Agregar archivos al ZIP
     for (const purchase of purchases) {
@@ -55,11 +55,12 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // Finalizar el ZIP
-    await archive.finalize();
-
-    // Combinar chunks en un buffer
-    const zipBuffer = Buffer.concat(chunks);
+    // Finalizar el ZIP y esperar fin de stream
+    const zipBuffer: Buffer = await new Promise((resolve, reject) => {
+      pass.on('end', () => resolve(Buffer.concat(chunks)));
+      pass.on('error', reject);
+      archive.finalize().catch(reject);
+    });
 
     // Crear nombre del archivo ZIP
     const zipFileName = `FinData_Chile_${userEmail}_${new Date().toISOString().split('T')[0]}.zip`;

@@ -1,19 +1,22 @@
 "use client"
 
 import { useEffect, useMemo, useState } from "react"
+import { usePathname } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
 import { Separator } from "@/components/ui/separator"
 import { Input } from "@/components/ui/input"
-import { CreditCard, ShoppingCart, X } from "lucide-react"
+import { CreditCard, ShoppingCart, X, CheckCircle, ShieldCheck, Clock } from "lucide-react"
 import { usePayment } from "@/hooks/use-payment"
+import { getClpPerUsd } from "@/lib/utils"
 import { useToast } from "@/hooks/use-toast"
 
 interface CartItem {
   product_id: string
   company_name: string
   year_range: string
+  sector?: string
   price: number
 }
 
@@ -23,12 +26,13 @@ export function CartWidget() {
   const [loading, setLoading] = useState(false)
   const [userEmail, setUserEmail] = useState<string>("")
   const [showEmailDialog, setShowEmailDialog] = useState(false)
+  const [recommended, setRecommended] = useState<any[]>([])
   const { initiatePayment, isProcessing } = usePayment()
   const { toast } = useToast()
+  const pathname = usePathname()
 
-  const usdToClpRate = 1000
-  const totalUsd = useMemo(() => items.reduce((sum, i) => sum + Number(i.price || 0), 0), [items])
-  const totalClp = useMemo(() => Math.round(totalUsd * usdToClpRate), [totalUsd])
+  const [usdToClpRate, setUsdToClpRate] = useState(1)
+  const totalClp = useMemo(() => items.reduce((sum, i) => sum + Math.round(Number(i.price || 0)), 0), [items])
   const formatClp = (v: number) => new Intl.NumberFormat('es-CL', { style: 'currency', currency: 'CLP', maximumFractionDigits: 0 }).format(v)
 
   const effectiveEmail = userEmail?.trim() || "guest"
@@ -44,6 +48,7 @@ export function CartWidget() {
             product_id: it.product_id,
             company_name: it.company_name,
             year_range: it.year_range,
+            sector: it.sector,
             price: Number(it.price),
           }))
         )
@@ -55,7 +60,34 @@ export function CartWidget() {
     }
   }
 
+  const loadRecommendations = async () => {
+    try {
+      // Solo recomendar cuando haya al menos un ítem en el carrito
+      if (items.length === 0) {
+        setRecommended([])
+        return
+      }
+      const resp = await fetch('/api/products')
+      if (!resp.ok) return
+      const products = await resp.json()
+      const inCartIds = new Set(items.map(i => i.product_id))
+      const firstSector = (products.find((p: any) => inCartIds.has(p.id))?.sector) || items[0]?.sector
+      const candidates = products
+        .filter((p: any) => p.isActive && !inCartIds.has(p.id))
+        .sort((a: any, b: any) => {
+          const aMatch = a.sector === firstSector ? 1 : 0
+          const bMatch = b.sector === firstSector ? 1 : 0
+          return bMatch - aMatch
+        })
+        .slice(0, 3)
+      setRecommended(candidates)
+    } catch {}
+  }
+
   useEffect(() => {
+    // CLP nativo
+    setUsdToClpRate(1)
+    
     // Intentar obtener email autenticado desde API; fallback a localStorage (temporal)
     fetch('/api/auth/me').then(async (r) => {
       if (r.ok) {
@@ -73,14 +105,28 @@ export function CartWidget() {
 
     const onUpdated = () => loadCart()
     window.addEventListener("cart:updated", onUpdated as EventListener)
-    return () => window.removeEventListener("cart:updated", onUpdated as EventListener)
+    const onOpen = () => setIsOpen(true)
+    window.addEventListener('cart:open', onOpen as EventListener)
+    window.addEventListener('focus', onUpdated as EventListener)
+    return () => {
+      window.removeEventListener("cart:updated", onUpdated as EventListener)
+      window.removeEventListener('cart:open', onOpen as EventListener)
+      window.removeEventListener('focus', onUpdated as EventListener)
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   useEffect(() => {
     if (isOpen) loadCart()
+    if (isOpen) loadRecommendations()
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isOpen])
+
+  // Re-cargar carrito al cambiar de ruta (p.ej., volver del flujo de pago)
+  useEffect(() => {
+    loadCart()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pathname])
 
   const removeFromCart = async (productId: string) => {
     try {
@@ -114,6 +160,24 @@ export function CartWidget() {
     } catch (e) {}
   }
 
+  const addRecommendedToCart = async (product: any) => {
+    try {
+      const email = (userEmail && userEmail.trim() !== '' ? userEmail : 'guest')
+      const resp = await fetch('/api/cart/add', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ userEmail: email, productId: product.id })
+      })
+      if (resp.ok) {
+        await loadCart()
+        window.dispatchEvent(new CustomEvent('cart:updated'))
+        toast({ title: 'Agregado al carrito', description: `${product.companyName} agregado correctamente`, variant: 'success' })
+        // refrescar recomendaciones para evitar duplicar
+        await loadRecommendations()
+      }
+    } catch {}
+  }
+
   const saveEmailAndSync = async (email: string) => {
     setUserEmail(email)
     localStorage.setItem('userEmail', email)
@@ -131,6 +195,14 @@ export function CartWidget() {
           })
         }
       }
+      // Enviar email de recordatorio de carrito
+      try {
+        await fetch('/api/notifications/cart-email', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ userEmail: email }),
+        })
+      } catch {}
     } catch {}
     window.dispatchEvent(new CustomEvent('cart:updated'))
     toast({ title: "Email guardado", description: "Tu email ha sido guardado para futuras compras" })
@@ -140,18 +212,18 @@ export function CartWidget() {
     <>
       <Dialog open={isOpen} onOpenChange={setIsOpen}>
         <DialogTrigger asChild>
-          <Button variant="outline" className="relative bg-transparent text-xs md:text-sm">
+          <Button variant="outline" className="relative bg-white text-slate-800 border-slate-200 hover:bg-slate-50 text-xs md:text-sm">
             <ShoppingCart className="h-3 w-3 md:h-4 md:w-4 mr-1 md:mr-2" />
             <span className="hidden sm:inline">Carrito</span>
             <span className="sm:hidden">({items.length})</span>
             {items.length > 0 && (
-              <Badge className="absolute -top-1 -right-1 md:-top-2 md:-right-2 bg-green-600 text-white text-xs px-1 py-0.5">
+              <Badge className="absolute -top-1 -right-1 md:-top-2 md:-right-2 bg-sky-600 text-white text-xs px-1 py-0.5">
                 {items.length}
               </Badge>
             )}
           </Button>
         </DialogTrigger>
-        <DialogContent className="max-w-md">
+          <DialogContent className="max-w-md w-[calc(100%-1.5rem)]">
           <DialogHeader>
             <DialogTitle>Tu Carrito</DialogTitle>
             <DialogDescription>
@@ -161,15 +233,15 @@ export function CartWidget() {
 
           {items.length > 0 ? (
             <div className="space-y-4">
-              <div className="max-h-60 overflow-y-auto space-y-2">
+              <div className="max-h-[55vh] overflow-y-auto space-y-2">
                 {items.map((item, idx) => (
-                  <div key={`${item.product_id}-${idx}`} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                  <div key={`${item.product_id}-${idx}`} className="flex items-center justify-between p-3 bg-slate-50 rounded-lg">
                     <div className="flex-1">
-                      <p className="font-medium text-sm">{item.company_name}</p>
-                      <p className="text-xs text-gray-500">{item.year_range}</p>
+                      <p className="font-medium text-sm text-slate-800">{item.company_name}</p>
+                      <p className="text-xs text-slate-500">{item.year_range}</p>
                     </div>
                     <div className="flex items-center space-x-2">
-                      <span className="font-semibold">${item.price}</span>
+                      <span className="font-semibold">{formatClp(Number(item.price || 0))}</span>
                       <Button
                         variant="ghost"
                         size="sm"
@@ -185,20 +257,20 @@ export function CartWidget() {
 
               <Separator />
 
-              <div className="space-y-1">
-                <div className="flex justify-between items-center font-semibold text-sm">
-                  <span>Total (USD):</span>
-                  <span>${totalUsd.toFixed(2)} USD</span>
+              <div className="space-y-2">
+                <div className="flex justify-between items-center font-semibold text-sm text-slate-800">
+                  <span>Total:</span>
+                  <span>{formatClp(totalClp)}</span>
                 </div>
-                <div className="flex justify-between items-center font-bold">
-                  <span>Total a pagar (CLP aprox.):</span>
-                  <span className="text-green-600">{formatClp(totalClp)}</span>
+                <div className="flex items-center justify-between text-[11px] text-slate-600">
+                  <div className="flex items-center gap-1"><ShieldCheck className="h-3.5 w-3.5 text-blue-600" /> Pago seguro Transbank</div>
+                  <div className="flex items-center gap-1"><CheckCircle className="h-3.5 w-3.5 text-emerald-600" /> Datos oficiales CMF</div>
+                  <div className="flex items-center gap-1"><Clock className="h-3.5 w-3.5 text-sky-600" /> Entrega inmediata</div>
                 </div>
-                <p className="text-xs text-gray-500 text-right">Se cobra en CLP vía Transbank (1 USD ≈ {usdToClpRate.toLocaleString('es-CL')} CLP)</p>
               </div>
 
               <Button 
-                className="w-full bg-green-600 hover:bg-green-700"
+                className="w-full bg-blue-600 hover:bg-blue-700"
                 onClick={handleCheckout}
                 disabled={isProcessing}
               >
@@ -210,12 +282,34 @@ export function CartWidget() {
                 Pagar con WebPay
               </Button>
 
-              <p className="text-xs text-gray-500 text-center">Pago seguro con Transbank</p>
+              <p className="text-xs text-slate-500 text-center">Compra 100% segura. Recibirás enlaces de descarga por email.</p>
             </div>
           ) : (
             <div className="text-center py-8">
               <ShoppingCart className="h-12 w-12 text-gray-300 mx-auto mb-4" />
               <p className="text-gray-500">Agrega archivos a tu carrito para comenzar</p>
+            </div>
+          )}
+
+          {items.length > 0 && recommended.length > 0 && (
+            <div className="mt-2 border-t pt-3">
+              <p className="text-xs font-semibold mb-2 text-gray-700">También te puede interesar</p>
+              <div className="space-y-2">
+                {recommended.map((p) => (
+                  <div key={p.id} className="flex items-center justify-between p-2 rounded-md bg-gray-50">
+                    <div className="min-w-0 pr-2">
+                      <p className="text-sm font-medium truncate">{p.companyName}</p>
+                      <p className="text-[11px] text-gray-500 truncate">{p.yearRange} • {p.sector}</p>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <span className="text-sm font-semibold">{formatClp(Number(p.price || 0))}</span>
+                      <Button size="sm" className="h-7 px-3 bg-green-600 hover:bg-green-700" onClick={() => addRecommendedToCart(p)}>
+                        Añadir
+                      </Button>
+                    </div>
+                  </div>
+                ))}
+              </div>
             </div>
           )}
         </DialogContent>

@@ -2,22 +2,68 @@
 
 import { useState } from "react"
 import { Button } from "@/components/ui/button"
+import { Checkbox } from "@/components/ui/checkbox"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Check, Crown, Star, TrendingUp, Users, FileText, BarChart3 } from "lucide-react"
 import { useToast } from "@/hooks/use-toast"
 
 export function SubscriptionSurvey() {
+  const enabled = typeof window !== 'undefined' ? (process.env.NEXT_PUBLIC_SUBSCRIPTIONS_ENABLED === 'true') : false
   const [hasSubmitted, setHasSubmitted] = useState(false)
   const [isLoading, setIsLoading] = useState(false)
   const [showForm, setShowForm] = useState(false)
   const [formData, setFormData] = useState({
     name: "",
     email: "",
+  interests: [] as string[],
+  useCase: "",
   })
   const { toast } = useToast()
 
   const handleSurveySubmit = async (wouldPay: boolean) => {
+    // Si dice "No" y no ha llenado datos, solo enviar la respuesta negativa
+    if (!wouldPay && (!formData.name || !formData.email)) {
+      setIsLoading(true)
+      
+      try {
+        const response = await fetch('/api/survey/submit', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ 
+            wouldPay: false,
+            name: 'Anónimo',
+            email: 'anonimo@temp.com',
+            interests: [],
+            useCase: '',
+          }),
+        })
+
+        if (!response.ok) {
+          throw new Error('Error enviando respuesta')
+        }
+
+        toast({
+          title: "¡Gracias por tu feedback!",
+          description: "Tu respuesta nos ayuda a mejorar",
+        })
+        
+        setHasSubmitted(true)
+      } catch (error) {
+        toast({
+          title: "Error",
+          description: "No se pudo enviar tu respuesta",
+          variant: "destructive",
+        })
+      } finally {
+        setIsLoading(false)
+      }
+      return
+    }
+
+    // Para respuestas positivas o cuando ya tiene datos
     if (!formData.name || !formData.email) {
       toast({
         title: "Campos requeridos",
@@ -39,6 +85,8 @@ export function SubscriptionSurvey() {
           wouldPay,
           name: formData.name,
           email: formData.email,
+          interests: formData.interests,
+          useCase: formData.useCase,
         }),
       })
 
@@ -87,6 +135,13 @@ export function SubscriptionSurvey() {
 
   return (
     <div className="max-w-4xl mx-auto">
+      {!enabled && (
+        <div className="flex justify-center mb-4">
+          <span className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-yellow-100 text-yellow-800 text-sm font-medium">
+            Próximamente
+          </span>
+        </div>
+      )}
       {/* Plan Premium */}
       <Card className="mb-8 bg-gradient-to-r from-purple-50 to-pink-50 border-purple-200">
         <CardHeader className="text-center">
@@ -105,7 +160,7 @@ export function SubscriptionSurvey() {
             </Badge>
           </div>
           <div className="text-4xl font-bold text-purple-600 mb-2">
-            $7 USD
+            $5.000 CLP
             <span className="text-lg font-normal text-gray-600">/mes</span>
           </div>
         </CardHeader>
@@ -258,6 +313,48 @@ export function SubscriptionSurvey() {
                   />
                 </div>
               </div>
+
+              <div className="space-y-2">
+                <label className="text-sm font-medium text-gray-700">¿Qué te interesa?</label>
+                <div className="grid sm:grid-cols-3 gap-3">
+                  {[
+                    { key: 'ratios', label: 'Ratios financieros' },
+                    { key: 'riesgo', label: 'Análisis de riesgo' },
+                    { key: 'valoraciones', label: 'Valoraciones (DCF/Comparables)' },
+                  ].map(opt => (
+                    <label key={opt.key} className="flex items-center gap-2 rounded-md border p-2 hover:bg-gray-50 cursor-pointer">
+                      <Checkbox
+                        checked={formData.interests.includes(opt.key)}
+                        onCheckedChange={(checked) => {
+                          setFormData(prev => {
+                            const exists = prev.interests.includes(opt.key)
+                            return {
+                              ...prev,
+                              interests: checked
+                                ? (exists ? prev.interests : [...prev.interests, opt.key])
+                                : prev.interests.filter(i => i !== opt.key)
+                            }
+                          })
+                        }}
+                        aria-label={opt.label}
+                      />
+                      <span className="text-sm text-gray-700">{opt.label}</span>
+                    </label>
+                  ))}
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <label className="text-sm font-medium text-gray-700">¿Para qué lo usarías? (opcional)</label>
+                <textarea
+                  value={formData.useCase}
+                  onChange={(e) => setFormData(prev => ({ ...prev, useCase: e.target.value }))}
+                  placeholder="Ej: monitoreo de cartera, levantamiento de capital, due diligence, benchmarking, etc."
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 min-h-24"
+                  maxLength={2000}
+                />
+                <p className="text-xs text-gray-500">Ayúdanos a priorizar las próximas funciones según tu caso de uso.</p>
+              </div>
               
               <div className="flex gap-2 justify-center">
                 <Button
@@ -290,6 +387,21 @@ export function SubscriptionSurvey() {
           )}
         </CardContent>
       </Card>
+      {/* Social proof & time savings */}
+      <div className="max-w-3xl mx-auto mt-6 grid sm:grid-cols-3 gap-3 text-xs text-gray-600">
+        <div className="rounded-md border bg-white p-3 text-center">
+          <div className="font-semibold text-gray-900">Hasta 3+ horas</div>
+          <div>ahorradas por reporte</div>
+        </div>
+        <div className="rounded-md border bg-white p-3 text-center">
+          <div className="font-semibold text-gray-900">+500 empresas</div>
+          <div>cobertura CMF</div>
+        </div>
+        <div className="rounded-md border bg-white p-3 text-center">
+          <div className="font-semibold text-gray-900">Formato estándar</div>
+          <div>listo para Excel</div>
+        </div>
+      </div>
     </div>
   )
 } 

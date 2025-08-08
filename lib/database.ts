@@ -76,21 +76,11 @@ export async function getUserById(id: number) {
 
 // Funciones de carrito
 export async function addToCart(userEmail: string, productId: string) {
-  if (isPostgresEnabled()) {
-    try {
-      await pgQuery('INSERT INTO cart_items (user_email, product_id) VALUES ($1, $2) ON CONFLICT DO NOTHING', [userEmail, productId])
-      return true
-    } catch {
-      return false
-    }
-  } else {
-    const db = await getDatabase()
-    try {
-      await db.run('INSERT INTO cart_items (user_email, product_id) VALUES (?, ?)', [userEmail, productId])
-      return true
-    } catch {
-      return false
-    }
+  try {
+    await pgQuery('INSERT INTO cart_items (user_email, product_id) VALUES ($1, $2) ON CONFLICT DO NOTHING', [userEmail, productId])
+    return true
+  } catch {
+    return false
   }
 }
 
@@ -348,5 +338,109 @@ export async function getUserPurchasedFiles(userEmail: string) {
        ORDER BY pr.company_name`,
       [userEmail]
     )
+  }
+}
+
+export async function saveSubscriptionSurvey(
+  name: string,
+  email: string,
+  wouldPay: boolean,
+  interests: string[],
+  useCase: string,
+  ipAddress?: string,
+  userAgent?: string
+) {
+  try {
+    const { rows } = await pgQuery<{ id: number }>(
+      `INSERT INTO subscription_survey 
+       (name, email, would_pay, interests, use_case, ip_address, user_agent) 
+       VALUES ($1, $2, $3, $4::jsonb, $5, $6, $7) 
+       RETURNING id`,
+      [name, email, wouldPay, JSON.stringify(interests), useCase, ipAddress, userAgent]
+    )
+    return rows[0]?.id
+  } catch (error: any) {
+    console.error('Error saving subscription survey:', error)
+    console.error('Data being saved:', { name, email, wouldPay, interests, useCase, ipAddress })
+    throw new Error('Error guardando encuesta')
+  }
+}
+
+export async function getSubscriptionSurveyStats() {
+  try {
+    const { rows: totalRows } = await pgQuery<{ count: string }>(
+      'SELECT COUNT(*) as count FROM subscription_survey'
+    )
+    
+    const { rows: interestedRows } = await pgQuery<{ count: string }>(
+      'SELECT COUNT(*) as count FROM subscription_survey WHERE would_pay = true'
+    )
+    
+    const { rows: recentRows } = await pgQuery<{ count: string }>(
+      'SELECT COUNT(*) as count FROM subscription_survey WHERE created_at >= NOW() - INTERVAL \'7 days\''
+    )
+
+    return {
+      total: parseInt(totalRows[0]?.count || '0'),
+      interested: parseInt(interestedRows[0]?.count || '0'),
+      recent: parseInt(recentRows[0]?.count || '0')
+    }
+  } catch (error) {
+    console.error('Error getting survey stats:', error)
+    return { total: 0, interested: 0, recent: 0 }
+  }
+}
+
+export async function getDetailedSurveyStats() {
+  try {
+    const basicStats = await getSubscriptionSurveyStats()
+    
+    // Obtener estadísticas por intereses
+    const { rows: interestRows } = await pgQuery<{ interest: string, count: string }>(
+      `SELECT 
+         JSONB_ARRAY_ELEMENTS_TEXT(interests) as interest,
+         COUNT(*) as count
+       FROM subscription_survey 
+       WHERE would_pay = true 
+         AND interests != '[]'::jsonb
+       GROUP BY interest
+       ORDER BY count DESC`
+    )
+    
+    // Obtener respuestas recientes con detalles
+    const { rows: recentResponses } = await pgQuery<{
+      id: number,
+      name: string,
+      email: string,
+      would_pay: boolean,
+      interests: string,
+      use_case: string,
+      created_at: string
+    }>(
+      `SELECT id, name, email, would_pay, interests, use_case, created_at
+       FROM subscription_survey 
+       ORDER BY created_at DESC 
+       LIMIT 10`
+    )
+
+    return {
+      ...basicStats,
+      interestBreakdown: interestRows.map(row => ({
+        interest: row.interest,
+        count: parseInt(row.count)
+      })),
+      recentResponses: recentResponses.map(row => ({
+        ...row,
+        interests: JSON.parse(row.interests || '[]')
+      }))
+    }
+  } catch (error) {
+    console.error('Error getting detailed survey stats:', error)
+    const basicStats = await getSubscriptionSurveyStats()
+    return {
+      ...basicStats,
+      interestBreakdown: [],
+      recentResponses: []
+    }
   }
 }

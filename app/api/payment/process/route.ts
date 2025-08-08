@@ -43,7 +43,7 @@ async function sendFileByEmail(paymentData: PaymentData, fileBuffer: Buffer, fil
           <div style="background-color: #f3f4f6; padding: 20px; border-radius: 8px; margin: 20px 0;">
             <h3 style="margin-top: 0;">Detalles del pedido:</h3>
             <p><strong>ID de Transacción:</strong> ${paymentData.transactionId}</p>
-            <p><strong>Total pagado:</strong> $${paymentData.amount} USD</p>
+            <p><strong>Total pagado:</strong> ${new Intl.NumberFormat('es-CL', { style: 'currency', currency: 'CLP', maximumFractionDigits: 0 }).format(Number(paymentData.amount || 0))}</p>
             <p><strong>Archivos incluidos:</strong> ${paymentData.productIds.length}</p>
           </div>
           
