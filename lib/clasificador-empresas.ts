@@ -1,4 +1,4 @@
-import empresasData from '@/data/empresas-chilenas.json'
+import empresasData from '@/lib/data/empresas-chilenas.json'
 
 export interface EmpresaInfo {
   nombre: string
