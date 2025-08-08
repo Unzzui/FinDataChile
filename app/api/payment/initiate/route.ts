@@ -26,7 +26,18 @@ export async function POST(request: NextRequest) {
     
     const { getProductsByIds } = await import('@/lib/database')
     const priceRows = await getProductsByIds(productIds)
-    for (const row of priceRows) total += Number(row.price || 0)
+    // Bloquear productos ya comprados (si hay email efectivo)
+    let filteredProductIds = productIds
+    if (effectiveEmail) {
+      const { rows: purchasedRows } = await pgQuery<{ product_id: string }>(
+        `SELECT product_id FROM purchases WHERE user_email = $1 AND status = 'completed' AND product_id = ANY($2::text[])`,
+        [effectiveEmail, productIds]
+      )
+      const purchasedSet = new Set(purchasedRows.map(r => r.product_id))
+      filteredProductIds = productIds.filter(id => !purchasedSet.has(id))
+    }
+    const effectivePriceRows = priceRows.filter(r => filteredProductIds.includes(r.id))
+    for (const row of effectivePriceRows) total += Number(row.price || 0)
     
     // Precios definidos en CLP en la BD. Transbank requiere CLP.
     const amount = Math.round(total)
@@ -61,8 +72,8 @@ export async function POST(request: NextRequest) {
     )
 
     // Guardar productos de la transacción para referencia en el retorno
-    for (const pid of productIds) {
-      const row = priceRows.find((r: any) => r.id === pid)
+    for (const pid of filteredProductIds) {
+      const row = effectivePriceRows.find((r: any) => r.id === pid)
       const price = row ? Number(row.price || 0) : 0
       await pgQuery(
         `INSERT INTO transaction_products (transaction_id, product_id, price, created_at)

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { pgQuery } from '@/lib/pg';
+import { revalidateTag } from 'next/cache';
 
 export async function PUT(request: NextRequest) {
   try {
@@ -62,6 +63,9 @@ export async function PUT(request: NextRequest) {
         id
       ]
     );
+
+    // invalidar caché del catálogo
+    try { revalidateTag('products') } catch {}
 
     return NextResponse.json({ 
       success: true, 

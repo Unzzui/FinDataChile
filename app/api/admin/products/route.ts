@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { pgQuery } from '@/lib/pg';
 import { blobStorage } from '@/lib/vercel-blob-storage';
+import { revalidateTag } from 'next/cache';
 
 // GET - Obtener todos los productos
 export async function GET() {
@@ -44,6 +45,8 @@ export async function POST(request: NextRequest) {
         isActive,
       ]
     );
+
+    try { revalidateTag('products') } catch {}
 
     return NextResponse.json({ 
       success: true, 
@@ -110,6 +113,8 @@ export async function DELETE(request: NextRequest) {
     await pgQuery('DELETE FROM purchases WHERE product_id = $1', [productId]);
     await pgQuery('DELETE FROM download_history WHERE product_id = $1', [productId]);
     await pgQuery('DELETE FROM products WHERE id = $1', [productId]);
+
+    try { revalidateTag('products') } catch {}
 
     return NextResponse.json({ 
       success: true, 

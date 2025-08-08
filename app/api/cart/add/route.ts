@@ -6,7 +6,7 @@ import crypto from 'crypto'
 
 export async function POST(request: NextRequest) {
   try {
-    const { userEmail, productId } = await request.json()
+    const { productId } = await request.json()
 
     if (!productId) {
       return NextResponse.json(
@@ -26,7 +26,7 @@ export async function POST(request: NextRequest) {
       email = `guest:${guestId}`
     }
 
-    // Verificar si ya existe
+    // Verificar si ya existe en carrito
     const { rows: existing } = await pgQuery('SELECT id FROM cart_items WHERE user_email = $1 AND product_id = $2', [email, productId])
     
     if (existing.length > 0) {
@@ -42,7 +42,26 @@ export async function POST(request: NextRequest) {
       return res
     }
 
-    // No existe, agregamos
+    // Si es usuario identificado (no guest), bloquear si ya compró
+    if (!email.startsWith('guest:')) {
+      const { rows: purchased } = await pgQuery(
+        "SELECT 1 FROM purchases WHERE user_email = $1 AND product_id = $2 AND status = 'completed' LIMIT 1",
+        [email, productId]
+      )
+      if (purchased.length > 0) {
+        const res = NextResponse.json({ 
+          success: false,
+          message: 'Ya compraste este producto',
+          alreadyPurchased: true
+        })
+        if (guestIdToSet) {
+          res.cookies.set('guestId', guestIdToSet, { path: '/', httpOnly: true, sameSite: 'lax', maxAge: 60 * 60 * 24 * 30 })
+        }
+        return res
+      }
+    }
+
+    // No existe, agregamos al carrito
     const success = await addToCart(email, productId)
 
     const res = NextResponse.json({ 

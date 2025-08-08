@@ -35,12 +35,10 @@ export function CartWidget() {
   const totalClp = useMemo(() => items.reduce((sum, i) => sum + Math.round(Number(i.price || 0)), 0), [items])
   const formatClp = (v: number) => new Intl.NumberFormat('es-CL', { style: 'currency', currency: 'CLP', maximumFractionDigits: 0 }).format(v)
 
-  const effectiveEmail = userEmail?.trim() || "guest"
-
   const loadCart = async () => {
     try {
       setLoading(true)
-      const response = await fetch(`/api/cart/items?userEmail=${encodeURIComponent(effectiveEmail)}`)
+      const response = await fetch(`/api/cart/items`)
       const data = await response.json()
       if (data.success) {
         setItems(
@@ -108,10 +106,13 @@ export function CartWidget() {
     const onOpen = () => setIsOpen(true)
     window.addEventListener('cart:open', onOpen as EventListener)
     window.addEventListener('focus', onUpdated as EventListener)
+    const onCartOpenRequest = () => setIsOpen(true)
+    window.addEventListener('cart:open-request', onCartOpenRequest as EventListener)
     return () => {
       window.removeEventListener("cart:updated", onUpdated as EventListener)
       window.removeEventListener('cart:open', onOpen as EventListener)
       window.removeEventListener('focus', onUpdated as EventListener)
+      window.removeEventListener('cart:open-request', onCartOpenRequest as EventListener)
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
@@ -130,11 +131,20 @@ export function CartWidget() {
 
   const removeFromCart = async (productId: string) => {
     try {
-      await fetch('/api/cart/remove', {
+      let resp = await fetch('/api/cart/remove', {
         method: 'DELETE',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ userEmail: effectiveEmail, productId })
+        body: JSON.stringify({ productId })
       })
+      if (!resp.ok) {
+        // inicializar guestId si faltaba y reintentar
+        await fetch('/api/cart/items')
+        resp = await fetch('/api/cart/remove', {
+          method: 'DELETE',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ productId })
+        })
+      }
       await loadCart()
       window.dispatchEvent(new CustomEvent('cart:updated'))
     } catch (e) {}
@@ -162,18 +172,21 @@ export function CartWidget() {
 
   const addRecommendedToCart = async (product: any) => {
     try {
-      const email = (userEmail && userEmail.trim() !== '' ? userEmail : 'guest')
       const resp = await fetch('/api/cart/add', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ userEmail: email, productId: product.id })
+        body: JSON.stringify({ productId: product.id })
       })
       if (resp.ok) {
-        await loadCart()
-        window.dispatchEvent(new CustomEvent('cart:updated'))
-        toast({ title: 'Agregado al carrito', description: `${product.companyName} agregado correctamente`, variant: 'success' })
-        // refrescar recomendaciones para evitar duplicar
-        await loadRecommendations()
+        const data = await resp.json()
+        if (data.alreadyPurchased) {
+          toast({ title: 'Ya comprado', description: `${product.companyName} ya está en tus compras` })
+        } else {
+          await loadCart()
+          window.dispatchEvent(new CustomEvent('cart:updated'))
+          toast({ title: 'Agregado al carrito', description: `${product.companyName} agregado correctamente`, variant: 'success' })
+          await loadRecommendations()
+        }
       }
     } catch {}
   }
@@ -184,14 +197,14 @@ export function CartWidget() {
     setShowEmailDialog(false)
     // opcional: sincronizar los productos del invitado al email
     try {
-      const guestResp = await fetch(`/api/cart/items?userEmail=guest`)
+      const guestResp = await fetch(`/api/cart/items`)
       const guestData = await guestResp.json()
       if (guestData.success && Array.isArray(guestData.items)) {
         for (const it of guestData.items) {
           await fetch('/api/cart/add', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ userEmail: email, productId: it.product_id })
+            body: JSON.stringify({ productId: it.product_id })
           })
         }
       }
@@ -270,7 +283,7 @@ export function CartWidget() {
               </div>
 
               <Button 
-                className="w-full bg-blue-600 hover:bg-blue-700"
+                className="w-full bg-gray-900 hover:bg-gray-800 text-white font-light px-6 py-3 rounded-xl"
                 onClick={handleCheckout}
                 disabled={isProcessing}
               >
@@ -303,7 +316,7 @@ export function CartWidget() {
                     </div>
                     <div className="flex items-center gap-2">
                       <span className="text-sm font-semibold">{formatClp(Number(p.price || 0))}</span>
-                      <Button size="sm" className="h-7 px-3 bg-green-600 hover:bg-green-700" onClick={() => addRecommendedToCart(p)}>
+                      <Button size="sm" className="h-7 px-3 bg-blue-600 text-white hover:bg-blue-700" onClick={() => addRecommendedToCart(p)}>
                         Añadir
                       </Button>
                     </div>

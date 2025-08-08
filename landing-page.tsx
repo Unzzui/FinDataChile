@@ -7,7 +7,7 @@ import Link from "next/link"
 
 export default function Component() {
   return (
-    <div className="min-h-screen bg-white">
+    <div className="min-h-screen bg-gray-50">
       {/* Clean corporate background */}
       <div className="pointer-events-none absolute inset-0 -z-10">
         {/* Minimal corporate grid */}
@@ -21,70 +21,73 @@ export default function Component() {
           <div className="container mx-auto px-4 md:px-6">
                      
             <div className="relative mb-8">
-              <h1 className="text-5xl md:text-7xl font-black tracking-tight mb-6 leading-none">
-                <span className="block text-slate-900">
+              <h1 className="text-5xl md:text-7xl font-light tracking-tight mb-6 leading-none">
+                <span className="block text-gray-900">
                   FinData Chile
                 </span>
-                <span className="block text-slate-600 text-3xl md:text-4xl font-bold mt-2">
-                  Datos financieros listos en 30 segundos
+                <span className="block text-gray-600 text-3xl md:text-4xl font-light mt-2">
+                  Datos financieros listos en 2 minutos
                 </span>
               </h1>
             </div>
             
-            <p className="text-xl md:text-2xl text-slate-600 max-w-4xl mx-auto mb-10 font-light leading-relaxed">
+            <p className="text-xl md:text-2xl text-gray-600 max-w-4xl mx-auto mb-10 font-light leading-relaxed">
               Ahorra 3+ horas por archivo evitando la digitación manual desde la CMF.
               <br className="hidden md:block" />
-              <span className="text-lg md:text-xl text-slate-500">Descarga los datos limpios, estandarizados y listos para analizar en Excel.</span>
+              <span className="text-lg md:text-xl text-gray-500 font-light">Descarga los datos limpios, estandarizados y listos para analizar en Excel.</span>
+            </p>
+            <p className="text-sm text-gray-500 max-w-2xl mx-auto -mt-6 mb-8">
+              Nota: El tiempo considera ingresar tarjeta y confirmar en WebPay.
             </p>
             
             {/* Corporate value props */}
             <div className="flex flex-wrap items-center justify-center gap-4 mb-8">
-              <div className="group cursor-default rounded-lg bg-white px-6 py-3 border border-slate-200 shadow-sm hover:shadow-md hover:border-sky-200 transition-all duration-300">
+              <div className="group cursor-default rounded-lg bg-white px-6 py-3 border border-gray-200 shadow-sm hover:shadow-md hover:border-gray-300 transition-all duration-300">
                 <div className="flex items-center gap-3">
-                  <Clock className="h-5 w-5 text-sky-600" />
-                  <span className="font-semibold text-slate-800">Descarga instantánea</span>
+                  <Clock className="h-5 w-5 text-gray-600" />
+                  <span className="font-light text-gray-800">Descarga instantánea</span>
                 </div>
               </div>
-              <div className="group cursor-default rounded-lg bg-white px-6 py-3 border border-slate-200 shadow-sm hover:shadow-md hover:border-blue-200 transition-all duration-300">
+              <div className="group cursor-default rounded-lg bg-white px-6 py-3 border border-gray-200 shadow-sm hover:shadow-md hover:border-gray-300 transition-all duration-300">
                 <div className="flex items-center gap-3">
-                  <Shield className="h-5 w-5 text-blue-600" />
-                  <span className="font-semibold text-slate-800">Datos oficiales CMF</span>
+                  <Shield className="h-5 w-5 text-gray-600" />
+                  <span className="font-light text-gray-800">Datos oficiales CMF</span>
                 </div>
               </div>
-              <div className="group cursor-default rounded-lg bg-white px-6 py-3 border border-slate-200 shadow-sm hover:shadow-md hover:border-emerald-200 transition-all duration-300">
+              <div className="group cursor-default rounded-lg bg-white px-6 py-3 border border-gray-200 shadow-sm hover:shadow-md hover:border-gray-300 transition-all duration-300">
                 <div className="flex items-center gap-3">
-                  <CheckCircle className="h-5 w-5 text-emerald-600" />
-                  <span className="font-semibold text-slate-800">Formato Excel estandarizado</span>
+                  <CheckCircle className="h-5 w-5 text-gray-600" />
+                  <span className="font-light text-gray-800">Formato Excel estandarizado</span>
                 </div>
               </div>
             </div>
 
                         <div className="flex flex-col sm:flex-row gap-4 w-full max-w-lg mx-auto mb-8">
               <Link href="/tienda">
-                <Button size="lg" className="bg-blue-600 hover:bg-blue-700 text-white text-lg px-8 py-4 h-auto w-full shadow-lg hover:shadow-xl transition-all duration-300">
+                <Button size="lg" className="bg-blue-600 text-white hover:bg-blue-700 text-lg px-8 py-4 h-auto w-full font-light rounded-xl shadow-lg hover:shadow-xl transition-all duration-300">
                   <Download className="mr-2 h-5 w-5" />
                   Ir al Marketplace
                 </Button>
               </Link>
               <a href="#ejemplo" className="w-full">
-                <Button variant="outline" size="lg" className="text-lg px-8 py-4 h-auto border-blue-200 text-blue-700 hover:bg-blue-50 bg-white w-full shadow-sm hover:border-blue-300 transition-all duration-300">
+                <Button variant="outline" size="lg" className="text-lg px-8 py-4 h-auto border-gray-200 text-gray-700 hover:bg-gray-50 bg-white w-full font-light rounded-xl shadow-sm hover:border-gray-300 transition-all duration-300">
                   Ver Ejemplo
                 </Button>
               </a>
             </div>
 
                         {/* Trust indicators */}
-            <div className="flex flex-wrap items-center justify-center gap-6 text-sm text-slate-500">
+            <div className="flex flex-wrap items-center justify-center gap-6 text-sm text-gray-500 font-light">
                 <div className="flex items-center gap-2">
-                <div className="h-2 w-2 rounded-full bg-emerald-500" />
+                <div className="h-2 w-2 rounded-full bg-gray-400" />
                 <span>Datos supervisados CMF</span>
               </div>
               <div className="flex items-center gap-2">
-                <div className="h-2 w-2 rounded-full bg-blue-500" />
+                <div className="h-2 w-2 rounded-full bg-gray-400" />
                 <span>+500 empresas disponibles</span>
               </div>
               <div className="flex items-center gap-2">
-                <div className="h-2 w-2 rounded-full bg-sky-500" />
+                <div className="h-2 w-2 rounded-full bg-gray-400" />
                 <span>Actualizaciones regulares</span>
               </div>
             </div>
@@ -95,10 +98,10 @@ export default function Component() {
         <section className="mb-20">
           <div className="container mx-auto px-4 md:px-6">
             <div className="text-center mb-12">
-              <h2 className="text-4xl md:text-5xl font-bold text-slate-800 mb-4">
+              <h2 className="text-4xl md:text-5xl font-light text-gray-900 mb-4">
                 Valor para su organización
               </h2>
-              <p className="text-xl text-slate-600 max-w-3xl mx-auto">
+              <p className="text-xl text-gray-600 max-w-3xl mx-auto font-light">
                 Transforme cómo su equipo accede y analiza información financiera del mercado chileno
               </p>
             </div>
@@ -106,19 +109,19 @@ export default function Component() {
             <div className="grid lg:grid-cols-2 gap-12 items-center">
               {/* Business Benefits */}
               <div className="space-y-6">
-                <Card className="border border-slate-200 bg-white shadow-lg">
-                                    <CardContent className="p-8">
+                <Card className="border border-gray-200 bg-white shadow-sm rounded-xl">
+                  <CardContent className="p-8">
                     <div className="flex items-start gap-4">
-                      <div className="p-3 bg-blue-50 rounded-lg shrink-0 border border-blue-100">
-                        <Clock className="h-8 w-8 text-blue-600" />
+                      <div className="p-3 bg-gray-50 rounded-lg shrink-0 border border-gray-100">
+                        <Clock className="h-8 w-8 text-gray-600" />
                       </div>
                       <div>
-                        <h3 className="text-xl font-bold text-slate-800 mb-3">Ahorro de tiempo significativo</h3>
-                        <p className="text-slate-600 leading-relaxed mb-4">
+                        <h3 className="text-xl font-light text-gray-900 mb-3">Ahorro de tiempo significativo</h3>
+                        <p className="text-gray-600 leading-relaxed mb-4 font-light">
                           Reduzca de 3+ horas a 30 segundos el tiempo necesario para obtener estados financieros estandarizados. 
                           Sus analistas pueden enfocarse en análisis estratégico en lugar de manipulación de datos.
                         </p>
-                        <div className="text-sm text-blue-600 font-medium">
+                        <div className="text-sm text-gray-600 font-light">
                           ROI estimado: 95% en el primer uso
                         </div>
                       </div>
@@ -126,19 +129,19 @@ export default function Component() {
                   </CardContent>
               </Card>
 
-                <Card className="border border-slate-200 bg-white shadow-lg">
+                <Card className="border border-gray-200 bg-white shadow-sm rounded-xl">
                   <CardContent className="p-8">
                     <div className="flex items-start gap-4">
-                      <div className="p-3 bg-emerald-50 rounded-lg shrink-0">
-                        <Shield className="h-8 w-8 text-emerald-600" />
+                      <div className="p-3 bg-gray-50 rounded-lg shrink-0">
+                        <Shield className="h-8 w-8 text-gray-600" />
                       </div>
                       <div>
-                        <h3 className="text-xl font-bold text-slate-800 mb-3">Precisión y consistencia</h3>
-                        <p className="text-slate-600 leading-relaxed mb-4">
+                        <h3 className="text-xl font-light text-gray-900 mb-3">Precisión y consistencia</h3>
+                        <p className="text-gray-600 leading-relaxed mb-4 font-light">
                           Elimine errores de transcripción y garantice consistencia en el formato de datos. 
                           Todos los estados financieros siguen el mismo estándar, facilitando comparaciones y análisis.
                         </p>
-                        <div className="text-sm text-emerald-600 font-medium">
+                        <div className="text-sm text-gray-600 font-light">
                           Reducción del 100% en errores de digitación
                         </div>
                       </div>
@@ -159,25 +162,38 @@ export default function Component() {
                   <CardContent className="p-6">
                     <div className="space-y-4">
                       <div className="flex justify-between py-3 border-b border-slate-200">
+                        <span className="text-slate-600">Sueldo mensual de referencia</span>
+                        <span className="font-semibold text-slate-800">$1.200.000 CLP</span>
+                      </div>
+                      <div className="flex justify-between py-3 border-b border-slate-200">
+                        <span className="text-slate-600">Horas laborales por mes (45 h/sem)</span>
+                        <span className="font-semibold text-slate-800">≈ 180 h/mes</span>
+                      </div>
+                      <div className="flex justify-between py-3 border-b border-slate-200">
+                        <span className="text-slate-600">Costo por hora estimado</span>
+                        <span className="font-semibold text-slate-800">$6.667 CLP</span>
+                      </div>
+                      <div className="flex justify-between py-3 border-b border-slate-200">
                         <span className="text-slate-600">Tiempo actual por análisis</span>
-                        <span className="font-semibold text-slate-800">3-5 horas</span>
+                        <span className="font-semibold text-slate-800">3 – 5 horas</span>
+                      </div>
+                      <div className="flex justify-between py-3 border-b border-slate-200">
+                        <span className="text-slate-600">Costo equivalente actual</span>
+                        <span className="font-semibold text-slate-800">$20.000 – $33.000 CLP</span>
                       </div>
                       <div className="flex justify-between py-3 border-b border-slate-200">
                         <span className="text-slate-600">Tiempo con FinData</span>
-                        <span className="font-semibold text-emerald-600">30 segundos</span>
-                      </div>
-                      <div className="flex justify-between py-3 border-b border-slate-200">
-                        <span className="text-slate-600">Costo por hora ($20.000 CLP)</span>
-                        <span className="font-semibold text-slate-800">$60.000 - $100.000</span>
+                        <span className="font-semibold text-emerald-600">2 minutos (pago WebPay)</span>
                       </div>
                       <div className="flex justify-between py-3 border-b border-slate-200">
                         <span className="text-slate-600">Precio FinData Chile</span>
                         <span className="font-semibold text-blue-600">Desde $2.000</span>
                       </div>
                       <div className="flex justify-between py-3 bg-blue-50 rounded-lg px-4 border border-blue-100">
-                        <span className="font-semibold text-slate-700">Ahorro por archivo</span>
-                        <span className="font-bold text-blue-600 text-lg">$58.000 - $98.000</span>
+                        <span className="font-semibold text-slate-700">Ahorro neto por archivo</span>
+                        <span className="font-bold text-blue-600 text-lg">$18.000 – $31.000 CLP</span>
                       </div>
+                      <p className="text-xs text-slate-500 mt-2">Cálculo basado en sueldo mensual $1.200.000, 180 h/mes y tiempo de pago WebPay de ~2 minutos.</p>
                     </div>
                   </CardContent>
                 </Card>
@@ -198,19 +214,19 @@ export default function Component() {
         {/* Stats Highlight */}
         <section className="mb-16">
           <div className="container mx-auto px-4 md:px-6">
-            <div className="bg-gradient-to-br from-blue-50 via-sky-50 to-slate-50 rounded-2xl p-8 border border-blue-100 shadow-lg">
+            <div className="bg-gray-50 rounded-2xl p-8 border border-gray-200 shadow-sm">
               <div className="grid md:grid-cols-3 gap-8 text-center">
                 <div className="space-y-2">
-                  <div className="text-3xl font-bold text-blue-600">+500</div>
-                  <p className="text-slate-600">empresas disponibles</p>
+                  <div className="text-3xl font-light text-gray-900">+500</div>
+                  <p className="text-gray-600 font-light">empresas disponibles</p>
                 </div>
                 <div className="space-y-2">
-                  <div className="text-3xl font-bold text-emerald-600">3+ horas</div>
-                  <p className="text-slate-600">ahorradas por archivo</p>
+                  <div className="text-3xl font-light text-gray-900">3+ horas</div>
+                  <p className="text-gray-600 font-light">ahorradas por archivo</p>
                 </div>
                 <div className="space-y-2">
-                  <div className="text-3xl font-bold text-sky-600">30 seg</div>
-                  <p className="text-slate-600">descarga instantánea</p>
+                  <div className="text-3xl font-light text-gray-900">2 min</div>
+                  <p className="text-gray-600 font-light">pago WebPay e inicio de descarga</p>
                 </div>
               </div>
             </div>
@@ -221,28 +237,28 @@ export default function Component() {
         <section className="grid md:grid-cols-3 gap-8 mb-16">
           <div className="container mx-auto px-4 md:px-6 col-span-full">
             <div className="text-center mb-12">
-              <h2 className="text-4xl md:text-5xl font-bold text-slate-800 mb-4">¿Por qué elegir FinData Chile?</h2>
-              <p className="text-xl text-slate-600 max-w-3xl mx-auto">
+              <h2 className="text-4xl md:text-5xl font-light text-gray-900 mb-4">¿Por qué elegir FinData Chile?</h2>
+              <p className="text-xl text-gray-600 max-w-3xl mx-auto font-light">
                 Profesionales que necesitan datos financieros rápidos y confiables confían en nosotros
               </p>
             </div>
 
             <div className="grid md:grid-cols-3 gap-8">
-              <Card className="border border-slate-200 bg-white shadow-lg hover:shadow-xl transition-shadow duration-300 hover:border-blue-200">
+              <Card className="border border-gray-200 bg-white shadow-sm rounded-xl hover:shadow-md transition-shadow duration-300">
                 <CardHeader className="text-center pb-4">
-                  <div className="mx-auto w-16 h-16 bg-blue-50 rounded-lg flex items-center justify-center mb-4 border border-blue-100">
-                    <Database className="h-8 w-8 text-blue-600" />
+                  <div className="mx-auto w-16 h-16 bg-gray-50 rounded-lg flex items-center justify-center mb-4 border border-gray-100">
+                    <Database className="h-8 w-8 text-gray-600" />
                   </div>
-                  <CardTitle className="text-xl font-bold text-slate-800">
+                  <CardTitle className="text-xl font-light text-gray-900">
                     Datos Estandarizados
                   </CardTitle>
                 </CardHeader>
-                <CardContent className="text-center text-slate-600 px-6 pb-8">
-                  <p className="leading-relaxed mb-4">
-                    <span className="font-semibold text-blue-600">Estados financieros uniformes</span> de todas las empresas 
+                <CardContent className="text-center text-gray-600 px-6 pb-8">
+                  <p className="leading-relaxed mb-4 font-light">
+                    <span className="font-medium text-gray-900">Estados financieros uniformes</span> de todas las empresas 
                     supervisadas por la CMF, listos para análisis inmediato.
                   </p>
-                  <div className="text-xs text-slate-500 space-y-1">
+                  <div className="text-xs text-gray-500 space-y-1 font-light">
                     <div>Formato Excel consistente</div>
                     <div>3 hojas organizadas</div>
                     <div>Compatibilidad total</div>
@@ -250,21 +266,21 @@ export default function Component() {
                 </CardContent>
               </Card>
 
-              <Card className="border border-slate-200 bg-white shadow-lg hover:shadow-xl transition-shadow duration-300 hover:border-emerald-200">
+              <Card className="border border-gray-200 bg-white shadow-sm rounded-xl hover:shadow-md transition-shadow duration-300">
                 <CardHeader className="text-center pb-4">
-                  <div className="mx-auto w-16 h-16 bg-gradient-to-br from-emerald-50 to-teal-50 rounded-lg flex items-center justify-center mb-4 border border-emerald-100">
-                    <Shield className="h-8 w-8 text-emerald-600" />
+                  <div className="mx-auto w-16 h-16 bg-gray-50 rounded-lg flex items-center justify-center mb-4 border border-gray-100">
+                    <Shield className="h-8 w-8 text-gray-600" />
                   </div>
-                  <CardTitle className="text-xl font-bold text-slate-800">
+                  <CardTitle className="text-xl font-light text-gray-900">
                     Información Oficial
                   </CardTitle>
                 </CardHeader>
-                <CardContent className="text-center text-slate-600 px-6 pb-8">
-                  <p className="leading-relaxed mb-4">
-                    Datos <span className="font-semibold text-emerald-600">directos de la CMF</span> sin interpretaciones, 
+                <CardContent className="text-center text-gray-600 px-6 pb-8">
+                  <p className="leading-relaxed mb-4 font-light">
+                    Datos <span className="font-medium text-gray-900">directos de la CMF</span> sin interpretaciones, 
                     garantizando precisión y confiabilidad total.
                   </p>
-                  <div className="text-xs text-slate-500 space-y-1">
+                  <div className="text-xs text-gray-500 space-y-1 font-light">
                     <div>Fuente oficial verificada</div>
                     <div>Sin manipulación de datos</div>
                     <div>Trazabilidad completa</div>
@@ -272,21 +288,21 @@ export default function Component() {
                 </CardContent>
               </Card>
 
-              <Card className="border border-slate-200 bg-white shadow-lg hover:shadow-xl transition-shadow duration-300 hover:border-sky-200">
+              <Card className="border border-gray-200 bg-white shadow-sm rounded-xl hover:shadow-md transition-shadow duration-300">
                 <CardHeader className="text-center pb-4">
-                  <div className="mx-auto w-16 h-16 bg-sky-50 rounded-lg flex items-center justify-center mb-4 border border-sky-100">
-                    <BarChart3 className="h-8 w-8 text-sky-600" />
+                  <div className="mx-auto w-16 h-16 bg-gray-50 rounded-lg flex items-center justify-center mb-4 border border-gray-100">
+                    <BarChart3 className="h-8 w-8 text-gray-600" />
                   </div>
-                  <CardTitle className="text-xl font-bold text-slate-800">
+                  <CardTitle className="text-xl font-light text-gray-900">
                     Análisis Eficiente
                   </CardTitle>
                 </CardHeader>
-                <CardContent className="text-center text-slate-600 px-6 pb-8">
-                  <p className="leading-relaxed mb-4">
-                    <span className="font-semibold text-sky-600">Comparaciones directas</span> entre empresas 
+                <CardContent className="text-center text-gray-600 px-6 pb-8">
+                  <p className="leading-relaxed mb-4 font-light">
+                    <span className="font-medium text-gray-900">Comparaciones directas</span> entre empresas 
                     y períodos, sin pérdida de tiempo en formateo manual.
                   </p>
-                  <div className="text-xs text-slate-500 space-y-1">
+                  <div className="text-xs text-gray-500 space-y-1 font-light">
                     <div>Benchmarking inmediato</div>
                     <div>Análisis temporal simple</div>
                     <div>Ratios comparables</div>

@@ -231,6 +231,7 @@ Card de beneficios:
 - No aplicar gradientes en texto ni efectos decorativos al logo
 - No usar azules demasiado saturados/oscuros fuera de 600–700 para CTAs
 - No mezclar múltiples acentos en la misma vista
+- No utilizar emojis.
 
 ---
 

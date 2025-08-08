@@ -84,49 +84,51 @@ export default function RegistroPage() {
     <div className="min-h-screen bg-gray-50 flex items-center justify-center py-12 px-4 sm:px-6 lg:px-8">
       <div className="max-w-md w-full space-y-8">
         <div className="text-center">
-          <div className="mx-auto h-12 w-12 bg-blue-100 rounded-full flex items-center justify-center">
-            <UserPlus className="h-6 w-6 text-blue-600" />
+          <div className="mx-auto h-12 w-12 bg-gray-100 rounded-full flex items-center justify-center">
+            <UserPlus className="h-6 w-6 text-gray-600" />
           </div>
-          <h2 className="mt-6 text-3xl font-bold text-gray-900">
+          <h2 className="mt-6 text-3xl font-light text-gray-900">
             Crear Cuenta
           </h2>
-          <p className="mt-2 text-sm text-gray-600">
+          <p className="mt-2 text-sm text-gray-600 font-light">
             Regístrate para acceder a tus compras
           </p>
         </div>
 
-        <Card>
+        <Card className="rounded-xl border-gray-200 shadow-sm">
           <CardHeader>
-            <CardTitle className="text-center">Nueva cuenta</CardTitle>
+            <CardTitle className="text-center font-light text-gray-900">Nueva cuenta</CardTitle>
           </CardHeader>
           <CardContent>
             <form onSubmit={handleSubmit} className="space-y-4">
               <div className="space-y-2">
-                <Label htmlFor="name">Nombre completo</Label>
+                <Label htmlFor="name" className="font-light text-gray-700">Nombre completo</Label>
                 <Input
                   id="name"
                   type="text"
                   value={name}
                   onChange={(e) => setName(e.target.value)}
                   placeholder="Tu nombre completo"
+                  className="rounded-lg border-gray-200"
                   required
                 />
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="email">Email</Label>
+                <Label htmlFor="email" className="font-light text-gray-700">Email</Label>
                 <Input
                   id="email"
                   type="email"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   placeholder="tu@email.com"
+                  className="rounded-lg border-gray-200"
                   required
                 />
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="password">Contraseña</Label>
+                <Label htmlFor="password" className="font-light text-gray-700">Contraseña</Label>
                 <div className="relative">
                   <Input
                     id="password"
@@ -134,7 +136,7 @@ export default function RegistroPage() {
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
                     placeholder="Mínimo 6 caracteres"
-                    className="pr-10"
+                    className="pr-10 rounded-lg border-gray-200"
                     required
                   />
                   <Button

@@ -53,17 +53,9 @@ export function SiteHeader() {
     // cargar conteo de carrito
     const loadCartCount = async () => {
       try {
-        let effectiveEmail = ''
-        if (user?.email) effectiveEmail = user.email
-        else {
-          const saved = typeof window !== 'undefined' ? localStorage.getItem('userEmail') : null
-          effectiveEmail = (saved && saved.trim() !== '') ? saved : 'guest'
-        }
-        const resp = await fetch(`/api/cart/items?userEmail=${encodeURIComponent(effectiveEmail)}`)
+        const resp = await fetch('/api/cart/count')
         const data = await resp.json()
-        if (data?.success && Array.isArray(data.items)) {
-          setCartCount(data.items.length)
-        }
+        if (data?.success && typeof data.count === 'number') setCartCount(data.count)
       } catch {}
     }
     loadCartCount()
@@ -78,10 +70,10 @@ export function SiteHeader() {
     return (
       <Link
         href={href}
-        className={`text-[15px] md:text-base font-medium px-3 py-2 rounded-md transition-colors ${
+        className={`text-[15px] md:text-base font-light px-3 py-2 rounded-md transition-colors ${
           isActive
-            ? "bg-blue-50 text-blue-700"
-            : "text-gray-700 hover:text-gray-900 hover:bg-gray-100"
+            ? "bg-blue-50 text-blue-700 ring-1 ring-inset ring-blue-200"
+            : "text-gray-700 hover:text-gray-900 hover:bg-gray-50"
         }`}
       >
         {label}

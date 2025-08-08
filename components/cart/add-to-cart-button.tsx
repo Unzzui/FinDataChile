@@ -34,7 +34,7 @@ export function AddToCartButton({
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ userEmail, productId }),
+        body: JSON.stringify({ productId }),
       })
 
       const data = await response.json()
@@ -54,10 +54,14 @@ export function AddToCartButton({
         // Reset after 2 seconds
         setTimeout(() => setAdded(false), 2000)
       } else {
-        toast({
-          title: "Producto ya en carrito",
-          description: data.message
-        })
+        if (data.alreadyPurchased) {
+          toast({ title: 'Ya comprado', description: 'Este producto ya está en tus compras' })
+        } else {
+          toast({
+            title: "Producto ya en carrito",
+            description: data.message
+          })
+        }
       }
     } catch (error) {
       console.error('Error agregando al carrito:', error)

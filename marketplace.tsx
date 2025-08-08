@@ -23,25 +23,6 @@ import { clasificador } from '@/lib/clasificador-empresas'
 // (El CartManager no se usa aquí)
 import { DownloadButton } from "@/components/download-button"
 import React from "react"
-// Función para cargar productos desde la API
-async function loadProductsFromAPI() {
-  try {
-    console.log('Iniciando carga de productos...');
-    const response = await fetch('/api/products');
-    console.log('Respuesta de API:', response.status, response.statusText);
-    
-    if (!response.ok) {
-      throw new Error(`Error cargando productos: ${response.status}`);
-    }
-    
-    const data = await response.json();
-    console.log('Productos cargados:', data.length);
-    return data;
-  } catch (error) {
-    console.error('Error cargando productos:', error);
-    return [];
-  }
-}
 
 interface CartItem {
   productId: string;
@@ -72,15 +53,31 @@ function SkeletonCard() {
   )
 }
 
-export default function Component() {
+type Product = {
+  id: string
+  companyName: string
+  sector: string
+  yearRange: string
+  startYear: number
+  endYear: number
+  price: number
+  filePath: string
+  description: string
+  isActive: boolean
+  isQuarterly: boolean
+  createdAt: string
+  updatedAt: string
+}
+
+export default function Component({ initialProducts = [] as Product[] }: { initialProducts?: Product[] }) {
   const [searchTerm, setSearchTerm] = useState("")
   const [selectedSector, setSelectedSector] = useState("todos")
   const [selectedYearRange, setSelectedYearRange] = useState("todos")
   const [sortBy, setSortBy] = useState("relevance")
   const [cart, setCart] = useState<CartItem[]>([])
   const [isCartDialogOpen, setIsCartDialogOpen] = useState(false)
-  const [products, setProducts] = useState<any[]>([])
-  const [isLoading, setIsLoading] = useState(true)
+  const [products, setProducts] = useState<Product[]>(initialProducts)
+  const [isLoading, setIsLoading] = useState(initialProducts.length === 0)
   const [userEmail, setUserEmail] = useState("")
   const [showEmailDialog, setShowEmailDialog] = useState(false)
   const [usdToClpRate, setUsdToClpRate] = useState(1)
@@ -88,8 +85,7 @@ export default function Component() {
   // Función para cargar el carrito desde la base de datos
   const loadCartFromDB = async () => {
     try {
-      const email = userEmail || 'guest'
-      const response = await fetch(`/api/cart/items?userEmail=${encodeURIComponent(email)}`)
+      const response = await fetch(`/api/cart/items`)
       if (response.ok) {
         const data = await response.json()
         if (data.success) {
@@ -122,16 +118,12 @@ export default function Component() {
   // Función optimizada para agregar al carrito sin recargar todo
   const addToCartOptimized = async (product: typeof products[0]) => {
     try {
-      const email = (userEmail && userEmail.trim() !== '' ? userEmail : 'guest')
-
-      // Agregar a la base de datos (soporta invitado 'guest')
       const response = await fetch('/api/cart/add', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          userEmail: email,
           productId: product.id,
         }),
       })
@@ -151,7 +143,7 @@ export default function Component() {
             price: product.price,
           }
           setCart((prev) => [...prev, newItem])
-          // Notificar al widget del navbar
+          // Notificar al resto de la app
           if (typeof window !== 'undefined') {
             window.dispatchEvent(new CustomEvent('cart:updated'))
           }
@@ -166,6 +158,15 @@ export default function Component() {
             description: `${product.companyName} ya está en tu carrito`,
             variant: "default",
           })
+        } else if (data.alreadyPurchased) {
+          toast({
+            title: 'Ya comprado',
+            description: `${product.companyName} ya está en tus compras`,
+            variant: 'default',
+          })
+          if (typeof window !== 'undefined') {
+            window.dispatchEvent(new CustomEvent('cart:updated'))
+          }
         }
       }
     } catch (error) {
@@ -194,37 +195,43 @@ export default function Component() {
     loadCartFromDB()
   }, [userEmail])
 
+  // Mantener sincronizado si el carrito cambia desde otros componentes o al volver el foco
+  useEffect(() => {
+    const onUpdated = () => loadCartFromDB()
+    window.addEventListener('cart:updated', onUpdated as EventListener)
+    window.addEventListener('focus', onUpdated as EventListener)
+    return () => {
+      window.removeEventListener('cart:updated', onUpdated as EventListener)
+      window.removeEventListener('focus', onUpdated as EventListener)
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
   // Cargar tipo de cambio CLP referencial
   useEffect(() => {
     setUsdToClpRate(1)
   }, [])
 
   // Guardar email en localStorage
-  const saveUserEmail = (email: string) => {
+    const saveUserEmail = (email: string) => {
     setUserEmail(email)
     localStorage.setItem('userEmail', email)
     setShowEmailDialog(false)
     
     // Sincronizar el carrito local con la base de datos después de guardar el email
-    if (cart.length > 0) {
-      // Agregar todos los items del carrito local a la base de datos
-      cart.forEach(async (item) => {
-        try {
-          await fetch('/api/cart/add', {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({
-              userEmail: email,
-              productId: item.productId,
-            }),
-          })
-        } catch (error) {
-          console.error('Error sincronizando carrito:', error)
-        }
-      })
-    }
+      if (cart.length > 0) {
+        cart.forEach(async (item) => {
+          try {
+            await fetch('/api/cart/add', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ productId: item.productId }),
+            })
+          } catch (error) {
+            console.error('Error sincronizando carrito:', error)
+          }
+        })
+      }
     
     toast({
       title: "Email guardado",
@@ -232,28 +239,48 @@ export default function Component() {
     })
   }
 
-  // Cargar productos al montar el componente
+  // Si no hay datos iniciales (fallback), cargar desde API
   useEffect(() => {
+    let cancelled = false
     const loadProducts = async () => {
+      if (initialProducts.length > 0) return
       try {
-        const loadedProducts = await loadProductsFromAPI()
-        console.log('Productos cargados desde API:', loadedProducts.length)
-        console.log('Productos activos:', loadedProducts.filter((p: any) => p.isActive).length)
-        console.log('Productos inactivos:', loadedProducts.filter((p: any) => !p.isActive).length)
-        setProducts(loadedProducts)
-      } catch (error) {
-        console.error('Error cargando productos:', error)
-        setProducts([])
+        const resp = await fetch('/api/products', { next: { revalidate: 300 } as any })
+        if (!resp.ok) throw new Error(String(resp.status))
+        const data = await resp.json()
+        if (!cancelled) setProducts(data)
+      } catch {
+        if (!cancelled) setProducts([])
       } finally {
-        setIsLoading(false)
+        if (!cancelled) setIsLoading(false)
       }
     }
-    
     loadProducts()
+    return () => { cancelled = true }
+  }, [initialProducts])
+
+  const [sectorsFromApi, setSectorsFromApi] = useState<string[] | null>(null)
+  const [yearRangesFromApi, setYearRangesFromApi] = useState<string[] | null>(null)
+
+  useEffect(() => {
+    let cancelled = false
+    const loadAggregates = async () => {
+      try {
+        const r = await fetch('/api/products/aggregates', { next: { revalidate: 120 } as any })
+        if (!r.ok) return
+        const data = await r.json()
+        if (!cancelled) {
+          setSectorsFromApi(Array.isArray(data.sectors) ? data.sectors : null)
+          setYearRangesFromApi(Array.isArray(data.yearRanges) ? data.yearRanges : null)
+        }
+      } catch {}
+    }
+    loadAggregates()
+    return () => { cancelled = true }
   }, [])
 
-  const sectores = useMemo(() => [...new Set(products.map((p) => p.sector))], [products])
-  const yearRanges = useMemo(() => [...new Set(products.map((p) => p.yearRange))], [products])
+  const sectores = useMemo(() => sectorsFromApi || [...new Set(products.map((p) => p.sector))], [sectorsFromApi, products])
+  const yearRanges = useMemo(() => yearRangesFromApi || [...new Set(products.map((p) => p.yearRange))], [yearRangesFromApi, products])
 
   const filteredProducts = useMemo(() => {
     let filtered = products.filter((product) => {
@@ -298,13 +325,12 @@ export default function Component() {
 
   const removeFromCart = async (productId: string) => {
     try {
-      const email = userEmail || 'guest'
       const response = await fetch('/api/cart/remove', {
         method: 'DELETE',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ userEmail: email, productId }),
+        body: JSON.stringify({ productId }),
       })
 
       if (response.ok) {

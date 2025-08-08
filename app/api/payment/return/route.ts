@@ -74,8 +74,14 @@ export async function POST(request: NextRequest) {
             itemsToProcess = (userCartItems || []).map((r: any) => r.product_id)
           }
 
-          // Registrar cada producto como una compra
+          // Registrar cada producto como una compra (evitando duplicados)
           for (const productId of itemsToProcess) {
+            // Si ya existe una compra completada previa, saltar
+            const { rows: existingPurchase } = await pgQuery(
+              "SELECT id FROM purchases WHERE user_email = $1 AND product_id = $2 AND status = 'completed' LIMIT 1",
+              [email, productId]
+            )
+            if (existingPurchase.length > 0) continue
             const { rows: prodRows } = await pgQuery('SELECT price FROM products WHERE id = $1', [productId])
             const product = prodRows[0]
             if (product && product.price != null) {

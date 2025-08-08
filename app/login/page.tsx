@@ -71,37 +71,38 @@ export default function LoginPage() {
     <div className="min-h-screen bg-gray-50 flex items-center justify-center py-12 px-4 sm:px-6 lg:px-8">
       <div className="max-w-md w-full space-y-8">
         <div className="text-center">
-          <div className="mx-auto h-12 w-12 bg-green-100 rounded-full flex items-center justify-center">
-            <Lock className="h-6 w-6 text-green-600" />
+          <div className="mx-auto h-12 w-12 bg-gray-100 rounded-full flex items-center justify-center">
+            <Lock className="h-6 w-6 text-gray-600" />
           </div>
-          <h2 className="mt-6 text-3xl font-bold text-gray-900">
+          <h2 className="mt-6 text-3xl font-light text-gray-900">
             Iniciar Sesión
           </h2>
-          <p className="mt-2 text-sm text-gray-600">
+          <p className="mt-2 text-sm text-gray-600 font-light">
             Accede a tu cuenta para ver tus compras
           </p>
         </div>
 
-        <Card>
+        <Card className="rounded-xl border-gray-200 shadow-sm">
           <CardHeader>
-            <CardTitle className="text-center">Acceso a tu cuenta</CardTitle>
+            <CardTitle className="text-center font-light text-gray-900">Acceso a tu cuenta</CardTitle>
           </CardHeader>
           <CardContent>
             <form onSubmit={handleSubmit} className="space-y-4">
               <div className="space-y-2">
-                <Label htmlFor="email">Email</Label>
+                <Label htmlFor="email" className="font-light text-gray-700">Email</Label>
                 <Input
                   id="email"
                   type="email"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   placeholder="tu@email.com"
+                  className="rounded-lg border-gray-200"
                   required
                 />
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="password">Contraseña</Label>
+                <Label htmlFor="password" className="font-light text-gray-700">Contraseña</Label>
                 <div className="relative">
                   <Input
                     id="password"
@@ -109,7 +110,7 @@ export default function LoginPage() {
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
                     placeholder="Tu contraseña"
-                    className="pr-10"
+                    className="pr-10 rounded-lg border-gray-200"
                     required
                   />
                   <Button
@@ -129,14 +130,14 @@ export default function LoginPage() {
               </div>
 
               {error && (
-                <Alert variant="destructive">
-                  <AlertDescription>{error}</AlertDescription>
+                <Alert variant="destructive" className="rounded-lg">
+                  <AlertDescription className="font-light">{error}</AlertDescription>
                 </Alert>
               )}
 
               <Button
                 type="submit"
-                className="w-full bg-green-600 hover:bg-green-700"
+                className="w-full bg-gray-900 hover:bg-gray-800 font-light rounded-lg"
                 disabled={isLoading}
               >
                 {isLoading ? (
@@ -148,9 +149,9 @@ export default function LoginPage() {
             </form>
 
             <div className="mt-6 text-center">
-              <p className="text-sm text-gray-600">
+              <p className="text-sm text-gray-600 font-light">
                 ¿No tienes cuenta?{" "}
-                <Link href="/registro" className="text-green-600 hover:text-green-700 font-medium">
+                <Link href="/registro" className="text-gray-900 hover:text-gray-700 font-light hover:underline">
                   Regístrate aquí
                 </Link>
               </p>
@@ -160,7 +161,7 @@ export default function LoginPage() {
 
         <div className="text-center">
           <Link href="/">
-            <Button variant="outline" size="sm">
+            <Button variant="outline" size="sm" className="font-light rounded-lg border-gray-200 text-gray-700 hover:bg-gray-50">
               <ArrowLeft className="h-4 w-4 mr-2" />
               Volver al inicio
             </Button>

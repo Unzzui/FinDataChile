@@ -32,7 +32,7 @@ export default function CartPage() {
   }, [])
 
   const load = async (email: string) => {
-    const resp = await fetch(`/api/cart/items?userEmail=${encodeURIComponent(email || 'guest')}`)
+    const resp = await fetch(`/api/cart/items`)
     const data = await resp.json()
     if (data.success) setItems(data.items || [])
   }
@@ -45,7 +45,7 @@ export default function CartPage() {
   const remove = async (productId: string) => {
     await fetch('/api/cart/remove', {
       method: 'DELETE', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ userEmail: userEmail || 'guest', productId })
+      body: JSON.stringify({ productId })
     })
     await load(userEmail)
     window.dispatchEvent(new CustomEvent('cart:updated'))
@@ -72,17 +72,21 @@ export default function CartPage() {
 
   const addRecommendedToCart = async (product: any) => {
     try {
-      const email = userEmail?.trim() || 'guest'
       const resp = await fetch('/api/cart/add', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ userEmail: email, productId: product.id })
+        body: JSON.stringify({ productId: product.id })
       })
       if (resp.ok) {
-        await load(userEmail)
-        window.dispatchEvent(new CustomEvent('cart:updated'))
-        toast({ title: 'Agregado al carrito', description: `${product.companyName} agregado correctamente`, variant: 'success' })
-        await loadRecommendations()
+        const data = await resp.json()
+        if (data.alreadyPurchased) {
+          toast({ title: 'Ya comprado', description: `${product.companyName} ya está en tus compras` })
+        } else {
+          await load(userEmail)
+          window.dispatchEvent(new CustomEvent('cart:updated'))
+          toast({ title: 'Agregado al carrito', description: `${product.companyName} agregado correctamente`, variant: 'success' })
+          await loadRecommendations()
+        }
       }
     } catch {}
   }
@@ -172,7 +176,7 @@ export default function CartPage() {
                             <span className="text-sm font-light text-gray-900">{formatClp(Number(p.price || 0))}</span>
                             <Button 
                               size="sm" 
-                              className="bg-gray-900 hover:bg-gray-800 text-white font-light px-4 py-2 rounded-lg" 
+                              className="bg-blue-600 text-white hover:bg-blue-700 font-light px-4 py-2 rounded-lg" 
                               onClick={() => addRecommendedToCart(p)}
                             >
                               Añadir

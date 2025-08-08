@@ -30,7 +30,7 @@ export function CartManager({ userEmail, onCheckout }: CartManagerProps) {
 
   const loadCartItems = async () => {
     try {
-      const response = await fetch(`/api/cart/items?userEmail=${encodeURIComponent(userEmail)}`)
+      const response = await fetch(`/api/cart/items`)
       const data = await response.json()
       
       if (data.success) {
@@ -55,7 +55,7 @@ export function CartManager({ userEmail, onCheckout }: CartManagerProps) {
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ userEmail, productId }),
+        body: JSON.stringify({ productId }),
       })
 
       const data = await response.json()

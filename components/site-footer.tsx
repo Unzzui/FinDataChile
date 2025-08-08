@@ -13,21 +13,21 @@ export function SiteFooter() {
           
           {/* Columna 1: Logo y descripción */}
           <div className="lg:col-span-1">
-            <Link href="/" className="block mb-6 group">
+            <Link href="/" className="block mb-6">
               <Image 
                 src="/logo-horizontal-light.svg" 
                 alt="FinData Chile" 
                 width={200} 
                 height={60} 
-                className="transition-transform duration-200 group-hover:scale-105"
+                className="select-none"
                 priority 
               />
             </Link>
-            <p className="text-slate-300 mb-6 text-sm leading-relaxed">
+            <p className="text-slate-300 mb-6 text-sm leading-relaxed font-light">
               Plataforma especializada en estados financieros de empresas chilenas. 
               Datos procesados, verificados y listos para análisis profesional.
             </p>
-            <div className="flex items-center gap-2 text-xs text-slate-400">
+            <div className="flex items-center gap-2 text-xs text-slate-400 font-light">
               <Building className="h-3 w-3" />
               <span>Datos oficiales de la CMF</span>
             </div>
@@ -35,14 +35,14 @@ export function SiteFooter() {
 
           {/* Columna 2: Enlaces rápidos */}
           <div>
-            <h4 className="font-semibold mb-4 text-white flex items-center gap-2">
-              <FileText className="h-4 w-4 text-blue-400" />
+            <h4 className="font-light mb-4 text-white flex items-center gap-2">
+              <FileText className="h-4 w-4 text-gray-400" />
               Productos
             </h4>
             <nav className="space-y-3">
               <Link 
                 href="/tienda" 
-                className="block text-sm text-slate-300 hover:text-blue-400 transition-all duration-200 hover:translate-x-1 transform hover:underline"
+                className="block text-sm text-slate-300 hover:text-gray-300 transition-all duration-200 hover:translate-x-1 transform hover:underline font-light"
               >
                 Catálogo de Empresas
               </Link>

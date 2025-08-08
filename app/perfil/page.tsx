@@ -164,7 +164,7 @@ export default function PerfilPage() {
   if (isLoading) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-600"></div>
       </div>
     )
   }
@@ -174,30 +174,30 @@ export default function PerfilPage() {
       <div className="container mx-auto px-4 py-8">
         <div className="mb-8">
           <Link href="/">
-            <Button variant="outline" className="mb-4">
+            <Button variant="outline" className="mb-4 font-light rounded-lg border-gray-200 text-gray-700 hover:bg-gray-50">
               <ArrowLeft className="h-4 w-4 mr-2" />
               Volver al inicio
             </Button>
           </Link>
-          <div className="relative overflow-hidden rounded-xl border bg-gradient-to-br from-green-50 to-blue-50 p-6">
+          <div className="relative overflow-hidden rounded-xl border border-gray-200 bg-white p-6 shadow-sm">
             <div className="flex items-center justify-between gap-4">
               <div className="flex items-center gap-4 min-w-0">
                 <Avatar className="h-12 w-12">
-                  <AvatarFallback>{(authUser?.name || authUser?.email || '?').charAt(0).toUpperCase()}</AvatarFallback>
+                  <AvatarFallback className="bg-gray-100 text-gray-600">{(authUser?.name || authUser?.email || '?').charAt(0).toUpperCase()}</AvatarFallback>
                 </Avatar>
                 <div className="min-w-0">
-                  <h1 className="text-2xl font-bold text-gray-900 truncate">Mi Perfil</h1>
-                  <p className="text-sm text-gray-700 truncate">{authUser?.name || '—'} • {authUser?.email || '—'}</p>
+                  <h1 className="text-2xl font-light text-gray-900 truncate">Mi Perfil</h1>
+                  <p className="text-sm text-gray-600 truncate font-light">{authUser?.name || '—'} • {authUser?.email || '—'}</p>
                 </div>
               </div>
               {authUser && (
-                <Button onClick={handleLogout} variant="outline" className="text-red-600"> <LogOut className="h-4 w-4 mr-2" /> Cerrar Sesión </Button>
+                <Button onClick={handleLogout} variant="outline" className="text-gray-600 font-light rounded-lg border-gray-200 hover:bg-gray-50"> <LogOut className="h-4 w-4 mr-2" /> Cerrar Sesión </Button>
               )}
             </div>
             <div className="mt-4 grid grid-cols-1 sm:grid-cols-3 gap-3">
-              <div className="rounded-lg bg-white/70 p-3 border">
-                <p className="text-xs text-gray-500">Compras</p>
-                <p className="text-lg font-semibold text-gray-900">{purchaseCount}</p>
+              <div className="rounded-lg bg-gray-50 p-3 border border-gray-200">
+                <p className="text-xs text-gray-500 font-light">Compras</p>
+                <p className="text-lg font-light text-gray-900">{purchaseCount}</p>
               </div>
               <div className="rounded-lg bg-white/70 p-3 border">
                 <p className="text-xs text-gray-500">Total gastado</p>
