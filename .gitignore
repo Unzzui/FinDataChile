@@ -24,7 +24,8 @@ temp/
 public/excel-products/
 
 # Base de datos local
-data/
+# Ignora SOLO la carpeta data/ en la raíz; permite subcarpetas como lib/data/
+/data/
 *.db
 *.sqlite
 
