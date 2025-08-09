@@ -4,8 +4,44 @@ import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/
 import { Badge } from "@/components/ui/badge"
 import { CheckCircle, Download, FileSpreadsheet, Clock, Shield, Zap, Calculator, DollarSign, BarChart3, Database, Award, TrendingUp, Building2, Briefcase } from "lucide-react"
 import Link from "next/link"
+import { pgQuery } from "@/lib/pg"
+import { unstable_cache } from "next/cache"
 
-export default function Component() {
+async function getLandingStatsCached() {
+  const getStats = unstable_cache(
+    async () => {
+      const { rows: priceRows } = await pgQuery<{ min_price: string | number | null }>(
+        "SELECT MIN(price)::numeric AS min_price FROM products WHERE is_active = true"
+      )
+      const { rows: countRows } = await pgQuery<{ cnt: number }>(
+        "SELECT COUNT(DISTINCT company_id)::int AS cnt FROM products WHERE is_active = true"
+      )
+      const minPrice = Number(priceRows?.[0]?.min_price || 0)
+      const companiesCount = Number(countRows?.[0]?.cnt || 0)
+      return { minPrice, companiesCount }
+    },
+    ["landing:stats"],
+    { revalidate: 120 }
+  )
+  return getStats()
+}
+
+function formatClp(v: number) {
+  return new Intl.NumberFormat('es-CL', { style: 'currency', currency: 'CLP', maximumFractionDigits: 0 }).format(Math.round(Number(v || 0)))
+}
+
+export default async function Component() {
+  const { minPrice, companiesCount } = await getLandingStatsCached()
+  // ROI dinámico basado en supuestos visibles en la UI
+  const salaryClp = 1_200_000
+  const hoursPerMonth = 180
+  const hourlyCost = salaryClp / hoursPerMonth // ≈ 6.667 CLP
+  const currentMinCost = 3 * hourlyCost
+  const currentMaxCost = 5 * hourlyCost
+  const finDataTimeHours = 2 / 60 // 2 minutos
+  const finDataTimeCost = hourlyCost * finDataTimeHours
+  const netMin = Math.max(0, currentMinCost - (minPrice + finDataTimeCost))
+  const netMax = Math.max(0, currentMaxCost - (minPrice + finDataTimeCost))
   return (
     <div className="min-h-screen bg-gray-50">
       {/* Clean corporate background */}
@@ -78,13 +114,13 @@ export default function Component() {
 
                         {/* Trust indicators */}
             <div className="flex flex-wrap items-center justify-center gap-6 text-sm text-gray-500 font-light">
-                <div className="flex items-center gap-2">
+              <div className="flex items-center gap-2">
                 <div className="h-2 w-2 rounded-full bg-gray-400" />
                 <span>Datos supervisados CMF</span>
               </div>
               <div className="flex items-center gap-2">
                 <div className="h-2 w-2 rounded-full bg-gray-400" />
-                <span>+500 empresas disponibles</span>
+                <span>{companiesCount.toLocaleString('es-CL')} empresas disponibles</span>
               </div>
               <div className="flex items-center gap-2">
                 <div className="h-2 w-2 rounded-full bg-gray-400" />
@@ -187,11 +223,11 @@ export default function Component() {
                       </div>
                       <div className="flex justify-between py-3 border-b border-slate-200">
                         <span className="text-slate-600">Precio FinData Chile</span>
-                        <span className="font-semibold text-blue-600">Desde $2.000</span>
+                        <span className="font-semibold text-blue-600">Desde {formatClp(minPrice)}</span>
                       </div>
                       <div className="flex justify-between py-3 bg-blue-50 rounded-lg px-4 border border-blue-100">
                         <span className="font-semibold text-slate-700">Ahorro neto por archivo</span>
-                        <span className="font-bold text-blue-600 text-lg">$18.000 – $31.000 CLP</span>
+                        <span className="font-bold text-blue-600 text-lg">{`${formatClp(netMin)} – ${formatClp(netMax)}`}</span>
                       </div>
                       <p className="text-xs text-slate-500 mt-2">Cálculo basado en sueldo mensual $1.200.000, 180 h/mes y tiempo de pago WebPay de ~2 minutos.</p>
                     </div>
@@ -217,7 +253,7 @@ export default function Component() {
             <div className="bg-gray-50 rounded-2xl p-8 border border-gray-200 shadow-sm">
               <div className="grid md:grid-cols-3 gap-8 text-center">
                 <div className="space-y-2">
-                  <div className="text-3xl font-light text-gray-900">+500</div>
+                  <div className="text-3xl font-light text-gray-900">{companiesCount.toLocaleString('es-CL')}</div>
                   <p className="text-gray-600 font-light">empresas disponibles</p>
                 </div>
                 <div className="space-y-2">
@@ -421,7 +457,7 @@ export default function Component() {
                 Empiece ahora
               </h2>
               <p className="text-slate-600 mb-6 max-w-lg mx-auto">
-                +500 empresas disponibles • Desde $2.000 CLP
+                {companiesCount.toLocaleString('es-CL')} empresas disponibles • Desde {formatClp(minPrice)}
               </p>
               
               <Link href="/tienda">

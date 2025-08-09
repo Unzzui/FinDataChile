@@ -81,6 +81,7 @@ export default function Component({ initialProducts = [] as Product[] }: { initi
   const [userEmail, setUserEmail] = useState("")
   const [showEmailDialog, setShowEmailDialog] = useState(false)
   const [usdToClpRate, setUsdToClpRate] = useState(1)
+  const [purchasedIds, setPurchasedIds] = useState<Set<string>>(new Set())
 
   // Función para cargar el carrito desde la base de datos
   const loadCartFromDB = async () => {
@@ -189,6 +190,26 @@ export default function Component({ initialProducts = [] as Product[] }: { initi
       setUserEmail(savedEmail)
     }
   }, [])
+
+  // Cargar compras del usuario para bloquear productos ya comprados
+  useEffect(() => {
+    const loadPurchases = async () => {
+      if (!userEmail || userEmail.trim() === '') {
+        setPurchasedIds(new Set())
+        return
+      }
+      try {
+        const resp = await fetch(`/api/user/purchases?userEmail=${encodeURIComponent(userEmail)}`)
+        if (!resp.ok) return
+        const data = await resp.json()
+        if (data?.success && Array.isArray(data.purchases)) {
+          const ids = new Set<string>(data.purchases.map((p: any) => String(p.product_id)))
+          setPurchasedIds(ids)
+        }
+      } catch {}
+    }
+    loadPurchases()
+  }, [userEmail])
 
   // Cargar carrito cuando cambie el email
   useEffect(() => {
@@ -347,7 +368,37 @@ export default function Component({ initialProducts = [] as Product[] }: { initi
 
 
 
-  const totalCart = useMemo(() => cart.reduce((sum, item) => sum + Number(item.price || 0), 0), [cart])
+  // Función para calcular precios con descuentos por paquetes
+  const calculatePackagePrice = (itemCount: number) => {
+    if (itemCount >= 5) {
+      // Para 5 o más: precio base de paquete 5 + items adicionales a precio reducido
+      const extraItems = itemCount - 5
+      return 9900 + (extraItems * 1900) // Items adicionales a $1.900 c/u
+    } else if (itemCount >= 3) {
+      // Para 3-4: precio base de paquete 3 + items adicionales a precio reducido  
+      const extraItems = itemCount - 3
+      return 6900 + (extraItems * 2200) // Items adicionales a $2.200 c/u
+    }
+    return itemCount * 2900 // Precio individual
+  }
+
+  // Función para calcular ahorros
+  const calculateSavings = (itemCount: number) => {
+    const individualPrice = itemCount * 2900
+    const packagePrice = calculatePackagePrice(itemCount)
+    return individualPrice - packagePrice
+  }
+
+  // Calcular precio total del carrito con descuentos
+  const totalCart = useMemo(() => {
+    const itemCount = cart.length
+    return calculatePackagePrice(itemCount)
+  }, [cart])
+
+  const totalSavings = useMemo(() => {
+    return calculateSavings(cart.length)
+  }, [cart])
+
   const totalClp = useMemo(() => Math.round(totalCart), [totalCart])
   const formatClp = (v: number) => new Intl.NumberFormat('es-CL', { style: 'currency', currency: 'CLP', maximumFractionDigits: 0 }).format(v)
 
@@ -368,6 +419,39 @@ export default function Component({ initialProducts = [] as Product[] }: { initi
               <p className="text-lg font-light text-gray-600">
                 Selecciona las empresas que necesitas
               </p>
+              
+              {/* Precios y descuentos */}
+              <div className="mt-8 bg-gradient-to-r from-blue-50 to-purple-50 rounded-lg p-6 border border-blue-100">
+                <h3 className="text-lg font-semibold text-gray-900 mb-4">Ofertas Especiales</h3>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <div className="bg-white rounded-lg p-4 border border-gray-200">
+                    <div className="text-sm text-gray-600 mb-1">Archivo Individual</div>
+                    <div className="text-2xl font-bold text-gray-900">$2.900</div>
+                    <div className="text-xs text-gray-500">Por empresa</div>
+                  </div>
+                  <div className="bg-white rounded-lg p-4 border-2 border-blue-500 relative">
+                    <div className="absolute -top-2 left-1/2 transform -translate-x-1/2 bg-blue-500 text-white px-2 py-1 rounded text-xs font-medium">
+                      Más Popular
+                    </div>
+                    <div className="text-sm text-gray-600 mb-1">Paquete 3 archivos</div>
+                    <div className="text-2xl font-bold text-blue-600">$6.900</div>
+                    <div className="text-xs text-green-600 font-medium">Ahorras $2.000</div>
+                    <div className="text-xs text-gray-500 mt-1">+$2.200 c/u adicional</div>
+                  </div>
+                  <div className="bg-white rounded-lg p-4 border-2 border-purple-500 relative">
+                    <div className="absolute -top-2 left-1/2 transform -translate-x-1/2 bg-purple-500 text-white px-2 py-1 rounded text-xs font-medium">
+                      Mejor Valor
+                    </div>
+                    <div className="text-sm text-gray-600 mb-1">Paquete 5 archivos</div>
+                    <div className="text-2xl font-bold text-purple-600">$9.900</div>
+                    <div className="text-xs text-green-600 font-medium">Ahorras $4.600</div>
+                    <div className="text-xs text-gray-500 mt-1">+$1.900 c/u adicional</div>
+                  </div>
+                </div>
+                <p className="text-xs text-gray-500 mt-3 text-center">
+                  Los descuentos se aplican automáticamente en tu carrito
+                </p>
+              </div>
             </div>
           </div>
         </section>
@@ -481,7 +565,16 @@ export default function Component({ initialProducts = [] as Product[] }: { initi
 
                     <div className="mb-4">
                       <h3 className="text-lg font-medium text-gray-900 group-hover:text-blue-600 transition-colors mb-3">
-                        {product.companyName}
+                        <a href={`/empresa/${product.companyName
+                          .toLowerCase()
+                          .normalize('NFKD')
+                          .replace(/[\u0300-\u036f]/g,'')
+                          .replace(/&/g,'-')
+                          .replace(/[^a-z0-9]+/g,'-')
+                          .replace(/-s-a(?:-[a-z0-9]+)*/g,'')
+                          .replace(/^-+|-+$/g,'')
+                          .replace(/^-+|-+$/g,'')
+                        }`}>{product.companyName}</a>
                       </h3>
                       
                       <div className="flex flex-wrap gap-2 mb-4">
@@ -491,6 +584,14 @@ export default function Component({ initialProducts = [] as Product[] }: { initi
                         <span className="px-3 py-1 text-xs bg-gray-50 text-gray-700 rounded-full border border-gray-200">
                           {product.yearRange}
                         </span>
+                        {Number.isFinite(product.startYear) && Number.isFinite(product.endYear) && (product.endYear >= product.startYear) && (
+                          <span className="px-3 py-1 text-xs bg-amber-50 text-amber-700 rounded-full border border-amber-200">
+                            {(() => {
+                              const total = (product.endYear - product.startYear + 1)
+                              return `${total} ${total === 1 ? 'año' : 'años'}`
+                            })()}
+                          </span>
+                        )}
                         <span className="px-3 py-1 text-xs bg-green-50 text-emerald-700 rounded-full border border-emerald-200">
                           {product.isQuarterly ? 'Trimestral' : 'Anual'}
                         </span>
@@ -518,7 +619,9 @@ export default function Component({ initialProducts = [] as Product[] }: { initi
                     </div>
 
                     <div className="border-t border-gray-100 pt-4">
-                      <div className="bg-gray-50 rounded-lg p-4 mb-4">
+                        <div className="bg-gray-50 rounded-lg p-4 mb-4 relative">
+                        {/* Badge de precio especial */}
+                   
                         <div className="flex items-center justify-between mb-3">
                           <div>
                             <div className="text-sm font-medium text-gray-900">
@@ -530,25 +633,33 @@ export default function Component({ initialProducts = [] as Product[] }: { initi
                           </div>
                           <div className="text-right">
                             <div className="text-xl font-medium text-gray-900">
-                              {formatClp(Number(product.price || 0))}
+                              $2.900
                             </div>
                             <div className="text-xs text-gray-500">
                               Por empresa
                             </div>
                           </div>
                         </div>
-                      </div>
-
-                      <div className="flex gap-3">
+                  
+                      </div>                      <div className="flex gap-3">
                         <button
                           onClick={() => addToCartOptimized(product)}
+                          disabled={purchasedIds.has(product.id)}
+                          title={purchasedIds.has(product.id) ? 'Ya comprado' : ''}
                           className={`flex-1 px-4 py-3 rounded-lg transition-all flex items-center justify-center gap-2 font-medium ${
-                            addedToCartId === product.id 
-                              ? 'bg-green-600 text-white' 
-                              : 'bg-blue-600 text-white hover:bg-blue-700'
+                            purchasedIds.has(product.id)
+                              ? 'bg-gray-300 text-gray-600 cursor-not-allowed'
+                              : (addedToCartId === product.id
+                                  ? 'bg-green-600 text-white'
+                                  : 'bg-blue-600 text-white hover:bg-blue-700')
                           }`}
                         >
-                          {addedToCartId === product.id ? (
+                          {purchasedIds.has(product.id) ? (
+                            <>
+                              <Check className="h-4 w-4" />
+                              <span>Comprado</span>
+                            </>
+                          ) : addedToCartId === product.id ? (
                             <>
                               <Check className="h-4 w-4" />
                               <span>Agregado</span>
@@ -593,7 +704,7 @@ export default function Component({ initialProducts = [] as Product[] }: { initi
 
       {/* Carrito Flotante */}
       {cart.length > 0 && (
-    <div className="fixed bottom-4 right-4 z-50 mb-[env(safe-area-inset-bottom)] mr-[env(safe-area-inset-right)]">
+        <div className="fixed bottom-4 right-4 z-50 mb-[env(safe-area-inset-bottom)] mr-[env(safe-area-inset-right)]">
           <Button
             onClick={() => {
               // Verificar si hay email, si no, pedirlo
@@ -604,11 +715,20 @@ export default function Component({ initialProducts = [] as Product[] }: { initi
               // Ir a página dedicada de carrito
               window.location.href = '/carrito'
             }}
-      className="bg-white text-slate-800 border border-slate-200 hover:bg-slate-50 shadow-lg rounded-full backdrop-blur-md px-4 py-2 md:px-6 md:py-3"
+            className="bg-white hover:bg-gray-50 text-blue-600 border border-blue-200 rounded-full px-4 py-3 md:px-6 shadow-lg"
           >
-            <ShoppingCart className="h-5 w-5 mr-2 text-blue-700" />
-            <span className="sm:hidden font-semibold">{cart.length} · {formatClp(totalCart)}</span>
-            <span className="hidden sm:inline font-semibold">{cart.length} archivo(s) · {formatClp(totalCart)} · Ver carrito y pagar</span>
+            <ShoppingCart className="h-5 w-5 mr-2 text-blue-600" />
+            <div className="flex flex-col items-start">
+              <div className="flex items-center gap-2">
+                <span className="font-semibold text-sm text-blue-600">{cart.length} archivo{cart.length !== 1 ? 's' : ''}</span>
+                <span className="font-bold text-blue-600">{formatClp(totalCart)}</span>
+              </div>
+              {totalSavings > 0 && (
+                <span className="text-xs text-green-600 font-medium">
+                  ¡Ahorras {formatClp(totalSavings)}!
+                </span>
+              )}
+            </div>
           </Button>
         </div>
       )}
@@ -633,7 +753,7 @@ export default function Component({ initialProducts = [] as Product[] }: { initi
                       <p className="text-xs text-slate-500">{item.yearRange} • {item.sector}</p>
                     </div>
                     <div className="flex items-center gap-2 ml-2">
-                      <span className="font-semibold text-sm">{formatClp(Number(item.price || 0))}</span>
+                      <span className="font-semibold text-sm">$2.900</span>
                       <Button
                         variant="ghost"
                         size="sm"
@@ -650,11 +770,34 @@ export default function Component({ initialProducts = [] as Product[] }: { initi
 
               <Separator />
 
-              <div className="space-y-1">
-                <div className="flex justify-between items-center font-semibold text-sm text-slate-800">
-                  <span>Total:</span>
-                  <span>{formatClp(totalClp)}</span>
+              <div className="space-y-2">
+                {/* Mostrar precio individual vs paquete */}
+                <div className="flex justify-between items-center text-sm text-slate-600">
+                  <span>Precio individual ({cart.length} × $2.900):</span>
+                  <span className={cart.length >= 3 ? "line-through" : ""}>{formatClp(cart.length * 2900)}</span>
                 </div>
+                
+                {/* Mostrar descuento aplicado */}
+                {cart.length >= 3 && (
+                  <div className="flex justify-between items-center text-sm text-green-600">
+                    <span>
+                      {cart.length >= 5 ? `Descuento (${cart.length} archivos):` : `Descuento (${cart.length} archivos):`}
+                    </span>
+                    <span>-{formatClp(totalSavings)}</span>
+                  </div>
+                )}
+
+                <div className="flex justify-between items-center font-semibold text-lg text-slate-800 pt-2 border-t">
+                  <span>Total a pagar:</span>
+                  <span className="text-green-600">{formatClp(totalClp)}</span>
+                </div>
+                
+                {totalSavings > 0 && (
+                  <p className="text-xs text-green-600 text-right font-medium">
+                    ¡Ahorras {formatClp(totalSavings)}!
+                  </p>
+                )}
+                
                 <p className="text-xs text-slate-500 text-right">Compra 100% segura con Transbank</p>
               </div>
 

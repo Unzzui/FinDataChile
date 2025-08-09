@@ -1,6 +1,7 @@
 import Marketplace from "../../marketplace"
 import { pgQuery } from "@/lib/pg"
 import { unstable_cache } from "next/cache"
+import type { Metadata } from 'next'
 
 export const revalidate = 120
 
@@ -51,4 +52,15 @@ const getActiveProductsCached = unstable_cache(
 export default async function TiendaPage() {
   const products = await getActiveProductsCached()
   return <Marketplace initialProducts={products} />
+}
+
+export const metadata: Metadata = {
+  title: 'Tienda de Estados Financieros',
+  description: 'Explora y compra estados financieros de empresas chilenas en formato Excel (CMF). Entrega inmediata.',
+  alternates: { canonical: '/tienda' },
+  openGraph: {
+    title: 'Tienda — FinData Chile',
+    description: 'Estados financieros de empresas chilenas en Excel',
+    url: '/tienda',
+  },
 }

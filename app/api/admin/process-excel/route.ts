@@ -3,6 +3,7 @@ import { promises as fs } from 'fs';
 import path from 'path';
 import * as XLSX from 'xlsx';
 import { upsertProduct } from '@/lib/database';
+import { pgQuery } from '@/lib/pg'
 import { verifyAdminToken } from '@/lib/admin-auth';
 import { blobStorage } from '@/lib/vercel-blob-storage'
 
@@ -140,6 +141,64 @@ async function analyzeExcelContent(filePath: string): Promise<{ startYear: numbe
   }
 }
 
+function parseRut(raw: string | null | undefined): { rutNumero: number | null; dv: string | null } {
+  if (!raw) return { rutNumero: null, dv: null }
+  const m = String(raw).trim().match(/^(\d{7,8})-([0-9kK])$/)
+  if (!m) return { rutNumero: null, dv: null }
+  const rutNumero = parseInt(m[1], 10)
+  const dv = m[2].toUpperCase()
+  return Number.isFinite(rutNumero) ? { rutNumero, dv } : { rutNumero: null, dv: null }
+}
+
+function parseRutFromFileName(name: string): { rutNumero: number | null; dv: string | null } {
+  const m = name.match(/(\d{7,8})-([0-9kK])/)
+  if (!m) return { rutNumero: null, dv: null }
+  return { rutNumero: parseInt(m[1], 10), dv: m[2].toUpperCase() }
+}
+
+async function findOrCreateCompanyByRut(rutNumero: number, dv: string, razonSocialFallback: string): Promise<{ id: number; razon_social: string }> {
+  // Buscar por RUT
+  const existing = await pgQuery<{ id: number; razon_social: string }>(
+    'SELECT id, razon_social FROM companies WHERE rut_numero = $1 AND rut_dv = $2 LIMIT 1',
+    [rutNumero, dv]
+  )
+  if (existing.rows[0]) return existing.rows[0]
+  // Crear mínima si no existe
+  const inserted = await pgQuery<{ id: number; razon_social: string }>(
+    `INSERT INTO companies (razon_social, rut, rut_numero, rut_dv, rut_sin_guion, rut_cmf)
+     VALUES ($1, $2, $3, $4, $5, $6)
+     RETURNING id, razon_social`,
+    [
+      razonSocialFallback || `Empresa ${rutNumero}-${dv}`,
+      `${rutNumero}-${dv}`,
+      rutNumero,
+      dv,
+      String(rutNumero),
+      `${rutNumero} - ${dv}`,
+    ]
+  )
+  return inserted.rows[0]
+}
+
+async function getRutFromExcelBuffer(buffer: Buffer): Promise<{ rutNumero: number | null; dv: string | null }> {
+  try {
+    const workbook = XLSX.read(buffer, { type: 'buffer' })
+    for (const sheetName of workbook.SheetNames) {
+      const sheet = workbook.Sheets[sheetName]
+      const rows: any[] = XLSX.utils.sheet_to_json(sheet, { defval: '', raw: true })
+      for (const row of rows) {
+        for (const [key, value] of Object.entries(row)) {
+          if (String(key).toLowerCase().includes('rut')) {
+            const { rutNumero, dv } = parseRut(String(value))
+            if (rutNumero && dv) return { rutNumero, dv }
+          }
+        }
+      }
+    }
+  } catch {}
+  return { rutNumero: null, dv: null }
+}
+
 export async function POST(request: NextRequest) {
   try {
     // Defensa en profundidad: verificar cookie adminToken además del middleware
@@ -210,10 +269,33 @@ export async function POST(request: NextRequest) {
         const price = Math.min(2000, Math.max(500, calculatePrice(startYear, endYear)));
         console.log(`Precio calculado: $${price}`);
         
+        // Intentar obtener RUT (prioridad: Excel -> nombre de archivo)
+        let { rutNumero, dv } = await getRutFromExcelBuffer(buffer)
+        if (!rutNumero || !dv) {
+          const parsed = parseRutFromFileName(file.name)
+          rutNumero = parsed.rutNumero
+          dv = parsed.dv
+        }
+
+        // Resolver company por RUT
+        let companyId = Math.floor(Math.random() * 1000) + 1
+        let resolvedCompanyName = companyName
+        if (rutNumero && dv) {
+          try {
+            const found = await findOrCreateCompanyByRut(rutNumero, dv, companyName)
+            if (found?.id) {
+              companyId = found.id
+              resolvedCompanyName = found.razon_social || companyName
+            }
+          } catch (e) {
+            console.warn('No se pudo resolver empresa por RUT, usando fallback hash:', e)
+          }
+        }
+
         // Subir a Vercel Blob en carpeta privada por producto
         const safeFinalName = sanitizeName(file.name)
         const upload = await blobStorage.uploadExcelFile(
-          `${companyName.toLowerCase().replace(/\s+/g, '-')}-${startYear}-${endYear}-${isQuarterly ? 'trimestral' : 'anual'}`,
+          `${(rutNumero && dv) ? `${rutNumero}-${dv}` : companyName.toLowerCase().replace(/\s+/g, '-')}-${startYear}-${endYear}-${isQuarterly ? 'trimestral' : 'anual'}`,
           safeFinalName,
           buffer
         )
@@ -223,12 +305,12 @@ export async function POST(request: NextRequest) {
         // No se requiere limpieza: no escribimos a disco en serverless
 
                        // Crear producto
-        const productId = `${companyName.toLowerCase().replace(/\s+/g, '-')}-${startYear}-${endYear}-${isQuarterly ? 'trimestral' : 'anual'}`;
+        const productId = `${(rutNumero && dv) ? `${rutNumero}-${dv}` : companyName.toLowerCase().replace(/\s+/g, '-')}-${startYear}-${endYear}-${isQuarterly ? 'trimestral' : 'anual'}`;
                
                const product = {
                  id: productId,
-                 companyId: Math.floor(Math.random() * 1000) + 1,
-                 companyName,
+                 companyId,
+                 companyName: resolvedCompanyName,
                  sector,
                  yearRange: `${startYear}-${endYear}`,
                  startYear,

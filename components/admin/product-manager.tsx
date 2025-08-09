@@ -260,12 +260,13 @@ export function ProductManager() {
 
   const handleDeleteProduct = async (productId: string) => {
     try {
-      const response = await fetch(`/api/admin/products?id=${productId}`, {
+      const response = await fetch(`/api/admin/products/${productId}`, {
         method: 'DELETE',
       })
 
       if (response.ok) {
         setProductList(prev => prev.filter(p => p.id !== productId))
+        setSelectedProducts(prev => prev.filter(id => id !== productId)) // También remover de seleccionados
         toast({
           title: "Producto eliminado",
           description: "El producto ha sido eliminado exitosamente",
@@ -297,10 +298,23 @@ export function ProductManager() {
   }
 
   const handleSelectAll = () => {
-    if (selectedProducts.length === filteredProducts.length) {
-      setSelectedProducts([])
+    const filteredProductIds = filteredProducts.map(p => p.id)
+    const selectedFilteredProducts = selectedProducts.filter(id => filteredProductIds.includes(id))
+    
+    if (selectedFilteredProducts.length === filteredProducts.length) {
+      // Si todos los productos filtrados están seleccionados, deseleccionar solo los filtrados
+      setSelectedProducts(prev => prev.filter(id => !filteredProductIds.includes(id)))
     } else {
-      setSelectedProducts(filteredProducts.map(p => p.id))
+      // Si no todos están seleccionados, seleccionar todos los filtrados
+      setSelectedProducts(prev => {
+        const newSelected = [...prev]
+        filteredProductIds.forEach(id => {
+          if (!newSelected.includes(id)) {
+            newSelected.push(id)
+          }
+        })
+        return newSelected
+      })
     }
   }
 
@@ -308,9 +322,18 @@ export function ProductManager() {
     if (selectedProducts.length === 0) return
 
     try {
-      const deletePromises = selectedProducts.map(productId =>
-        fetch(`/api/admin/products/${productId}`, { method: 'DELETE' })
-      )
+      const deletePromises = selectedProducts.map(async (productId) => {
+        const response = await fetch(`/api/admin/products/${productId}`, { 
+          method: 'DELETE' 
+        })
+        
+        if (!response.ok) {
+          const errorData = await response.json()
+          throw new Error(`Error eliminando producto ${productId}: ${errorData.error || 'Error desconocido'}`)
+        }
+        
+        return response.json()
+      })
       
       await Promise.all(deletePromises)
       
@@ -325,7 +348,7 @@ export function ProductManager() {
       console.error('Error eliminando productos:', error)
       toast({
         title: "Error",
-        description: "No se pudieron eliminar algunos productos",
+        description: error instanceof Error ? error.message : "No se pudieron eliminar algunos productos",
         variant: "destructive"
       })
     }
@@ -472,7 +495,11 @@ export function ProductManager() {
                 <div className="flex items-center space-x-2">
                   <Checkbox
                     id="select-all"
-                    checked={selectedProducts.length === filteredProducts.length}
+                    checked={(() => {
+                      const filteredProductIds = filteredProducts.map(p => p.id)
+                      const selectedFilteredProducts = selectedProducts.filter(id => filteredProductIds.includes(id))
+                      return selectedFilteredProducts.length === filteredProducts.length && filteredProducts.length > 0
+                    })()}
                     onCheckedChange={handleSelectAll}
                   />
                   <Label htmlFor="select-all" className="text-sm font-medium text-slate-700">
@@ -481,7 +508,11 @@ export function ProductManager() {
                 </div>
                 {selectedProducts.length > 0 && (
                   <span className="text-sm text-slate-600">
-                    {selectedProducts.length} de {filteredProducts.length} seleccionados
+                    {(() => {
+                      const filteredProductIds = filteredProducts.map(p => p.id)
+                      const selectedFilteredProducts = selectedProducts.filter(id => filteredProductIds.includes(id))
+                      return `${selectedFilteredProducts.length} de ${filteredProducts.length} seleccionados (${selectedProducts.length} total)`
+                    })()}
                   </span>
                 )}
               </div>

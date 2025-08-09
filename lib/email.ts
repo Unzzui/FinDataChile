@@ -1,4 +1,6 @@
 import nodemailer from 'nodemailer'
+import fs from 'fs/promises'
+import path from 'path'
 
 export interface CartEmailItem {
   companyName: string
@@ -165,7 +167,19 @@ async function buildBrandedEmail(args: {
     : ''
 
   const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000'
-  const headerImg = `<img src="${baseUrl}/logo-horizontal.svg" alt="FinData Chile" width="140" height="46" style="display:block" />`
+
+  // Intentar incrustar el logo como attachment inline (cid)
+  let headerImg = ''
+  const attachments: Array<{ filename: string; content: Buffer | string; contentType: string; cid: string }> = []
+  try {
+    const logoPath = path.resolve(process.cwd(), 'public', 'logo-horizontal.svg')
+    const svg = await fs.readFile(logoPath)
+    attachments.push({ filename: 'logo-horizontal.svg', content: svg, contentType: 'image/svg+xml', cid: 'logo-horizontal' })
+    headerImg = `<img src="cid:logo-horizontal" alt="FinData Chile" width="140" height="46" style="display:block" />`
+  } catch {
+    // Fallback a URL pública si no se pudo leer el archivo
+    headerImg = `<img src="${baseUrl}/logo-horizontal.svg" alt="FinData Chile" width="140" height="46" style="display:block" />`
+  }
 
   const html = `
   <!doctype html>
@@ -220,7 +234,7 @@ async function buildBrandedEmail(args: {
   return {
     html,
     text,
-    attachments: [],
+    attachments,
   }
 }
 

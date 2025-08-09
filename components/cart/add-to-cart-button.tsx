@@ -45,6 +45,9 @@ export function AddToCartButton({
           title: "Producto agregado",
           description: data.message
         })
+        if (typeof window !== 'undefined') {
+          window.dispatchEvent(new CustomEvent('cart:updated'))
+        }
         
         // Notificar que el carrito se actualizó
         if (onCartUpdated) {
@@ -75,11 +78,14 @@ export function AddToCartButton({
     }
   }
 
+  const baseColor = added ? 'bg-green-600 text-white' : 'bg-blue-600 text-white hover:bg-blue-700'
+  const mergedClass = className ? `${baseColor} ${className}` : baseColor
+
   return (
     <Button
       onClick={handleAddToCart}
       disabled={loading}
-      className={className}
+      className={mergedClass}
       variant={variant}
       size={size}
     >

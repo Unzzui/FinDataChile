@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { upsertProduct } from '@/lib/database'
 import { clasificarEmpresaDesdeArchivo } from '@/lib/clasificador-empresas'
 import { VercelBlobStorage } from '@/lib/vercel-blob-storage'
+import { pgQuery } from '@/lib/pg'
 
 const blobStorage = new VercelBlobStorage()
 
@@ -23,14 +24,62 @@ export async function POST(request: NextRequest) {
     }
 
     try {
-      // Clasificar empresa automáticamente (antes de subir para generar ID)
-      const empresaInfo = clasificarEmpresaDesdeArchivo(file.name)
+      // Parse RUT desde metadata (prioridad) o nombre de archivo
+      function parseRut(raw: string | null | undefined) {
+        if (!raw) return { rutNumero: null as number | null, dv: null as string | null }
+        const m = String(raw).trim().match(/^(\d{7,8})-([0-9kK])$/)
+        if (!m) return { rutNumero: null, dv: null }
+        return { rutNumero: parseInt(m[1], 10), dv: m[2].toUpperCase() }
+      }
+      function parseRutFromFileName(name: string) {
+        const m = name.match(/(\d{7,8})-([0-9kK])/)
+        if (!m) return { rutNumero: null as number | null, dv: null as string | null }
+        return { rutNumero: parseInt(m[1], 10), dv: m[2].toUpperCase() }
+      }
+      async function findOrCreateCompanyByRut(rutNumero: number, dv: string, razonSocialFallback: string) {
+        const existing = await pgQuery<{ id: number; razon_social: string }>(
+          'SELECT id, razon_social FROM companies WHERE rut_numero = $1 AND rut_dv = $2 LIMIT 1',
+          [rutNumero, dv]
+        )
+        if (existing.rows[0]) return existing.rows[0]
+        const inserted = await pgQuery<{ id: number; razon_social: string }>(
+          `INSERT INTO companies (razon_social, rut, rut_numero, rut_dv, rut_sin_guion, rut_cmf)
+           VALUES ($1, $2, $3, $4, $5, $6)
+           RETURNING id, razon_social`,
+          [
+            razonSocialFallback || `Empresa ${rutNumero}-${dv}`,
+            `${rutNumero}-${dv}`,
+            rutNumero,
+            dv,
+            String(rutNumero),
+            `${rutNumero} - ${dv}`,
+          ]
+        )
+        return inserted.rows[0]
+      }
+
+      const rutFromMeta = parseRut(metadata?.rut)
+      const rutFromName = parseRutFromFileName(file.name)
       
       // Extraer información del nombre del archivo
       const fileInfo = extractFileInfo(file.name)
       
+      // Resolver empresa por RUT si está disponible; si no, clasificar por nombre
+      const clasif = clasificarEmpresaDesdeArchivo(file.name)
+      let companyName = formatCompanyName(clasif.nombre)
+      let companyId: number | null = null
+      const rutNumero = rutFromMeta.rutNumero || rutFromName.rutNumero
+      const dv = rutFromMeta.dv || rutFromName.dv
+      if (rutNumero && dv) {
+        try {
+          const found = await findOrCreateCompanyByRut(rutNumero, dv, companyName)
+          companyId = found.id
+          companyName = found.razon_social || companyName
+        } catch {}
+      }
+
       // Generar ID único para el producto
-      const productId = generateProductId(empresaInfo.nombre, fileInfo.yearRange)
+      const productId = generateProductId((rutNumero && dv) ? `${rutNumero}-${dv}` : companyName, fileInfo.yearRange)
       
       // Convertir archivo a buffer para subir
       const arrayBuffer = await file.arrayBuffer()
@@ -45,15 +94,15 @@ export async function POST(request: NextRequest) {
       // Crear objeto producto para la base de datos
       const product = {
         id: productId,
-        companyId: generateCompanyId(empresaInfo.nombre),
-        companyName: formatCompanyName(empresaInfo.nombre),
-        sector: empresaInfo.sector,
+        companyId: companyId ?? generateCompanyId(companyName),
+        companyName,
+        sector: clasif.sector,
         yearRange: fileInfo.yearRange,
         startYear: fileInfo.startYear,
         endYear: fileInfo.endYear,
         price: determinePrice(fileInfo.periodType, fileInfo.yearRange),
         filePath: uploadResult.url, // Usar la URL de Vercel Blob Storage
-        description: generateDescription(formatCompanyName(empresaInfo.nombre), fileInfo),
+         description: generateShortDescription(formatCompanyName(clasif.nombre), clasif.sector),
         isQuarterly: fileInfo.periodType === 'trimestral',
         isActive: true,
         createdAt: new Date(),
@@ -68,7 +117,7 @@ export async function POST(request: NextRequest) {
         processedFiles: [{
           ...metadata,
           productId: productId,
-          empresaInfo,
+          empresaInfo: clasif,
           fileInfo,
           uploadUrl: uploadResult.url,
           success: true
@@ -162,12 +211,12 @@ function generateCompanyId(companyName: string): number {
 
 // Función para determinar precio basado en tipo y rango
 function determinePrice(periodType: string, yearRange: string): number {
-  // Precio fijo máximo de 2000 pesos por producto
-  return 2000
+  // Precio individual aplicando psicología de precios (terminado en .900)
+  return 2900
 }
 
 // Función para generar descripción
-function generateDescription(companyName: string, fileInfo: any): string {
-  const periodText = fileInfo.isQuarterly ? 'trimestrales' : 'anuales'
-  return `Estados financieros ${periodText} de ${companyName} período ${fileInfo.yearRange}. Incluye Balance General, Estado de Resultados y Flujo de Efectivo.`
+function generateShortDescription(companyName: string, sector: string): string {
+  const sectorSnippet = sector ? ` (${sector})` : ''
+  return `${companyName}${sectorSnippet}. Estados financieros oficiales en formato Excel.`
 }

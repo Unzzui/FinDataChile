@@ -32,7 +32,30 @@ export function CartWidget() {
   const pathname = usePathname()
 
   const [usdToClpRate, setUsdToClpRate] = useState(1)
-  const totalClp = useMemo(() => items.reduce((sum, i) => sum + Math.round(Number(i.price || 0)), 0), [items])
+  
+  // Función para calcular precios con descuentos por paquetes
+  const calculatePackagePrice = (itemCount: number) => {
+    if (itemCount >= 5) {
+      // Para 5 o más: precio base de paquete 5 + items adicionales a precio reducido
+      const extraItems = itemCount - 5
+      return 9900 + (extraItems * 1900) // Items adicionales a $1.900 c/u
+    } else if (itemCount >= 3) {
+      // Para 3-4: precio base de paquete 3 + items adicionales a precio reducido  
+      const extraItems = itemCount - 3
+      return 6900 + (extraItems * 2200) // Items adicionales a $2.200 c/u
+    }
+    return itemCount * 2900 // Precio individual
+  }
+
+  // Función para calcular ahorros
+  const calculateSavings = (itemCount: number) => {
+    const individualPrice = itemCount * 2900
+    const packagePrice = calculatePackagePrice(itemCount)
+    return individualPrice - packagePrice
+  }
+
+  const totalClp = useMemo(() => calculatePackagePrice(items.length), [items])
+  const totalSavings = useMemo(() => calculateSavings(items.length), [items])
   const formatClp = (v: number) => new Intl.NumberFormat('es-CL', { style: 'currency', currency: 'CLP', maximumFractionDigits: 0 }).format(v)
 
   const loadCart = async () => {
@@ -236,17 +259,29 @@ export function CartWidget() {
             )}
           </Button>
         </DialogTrigger>
-          <DialogContent className="max-w-md w-[calc(100%-1.5rem)]">
-          <DialogHeader>
+          <DialogContent className="max-w-md w-[calc(100%-1.5rem)] p-4 sm:p-6 flex flex-col max-h-[85vh] sm:max-h-[80vh] pb-[calc(0.5rem+env(safe-area-inset-bottom))]">
+          <DialogHeader className="flex-shrink-0">
             <DialogTitle>Tu Carrito</DialogTitle>
             <DialogDescription>
               {items.length === 0 ? "Tu carrito está vacío" : `${items.length} archivo(s) seleccionado(s)`}
             </DialogDescription>
           </DialogHeader>
 
+          {/* Aviso de descuento visible al abrir */}
+          {items.length > 0 && items.length < 5 && (
+            <div className="rounded-lg bg-gradient-to-r from-amber-50 to-yellow-50 border border-amber-200 p-2.5 text-[12px] text-amber-900 mb-2">
+              {items.length < 3 ? (
+                <>Agrega <span className="font-semibold">{3 - items.length}</span> archivo(s) para el <span className="font-semibold">Paquete 3</span> por <span className="font-semibold">$6.900</span>. Archivos adicionales a <span className="font-semibold">$2.200</span> c/u.</>
+              ) : (
+                <>Agrega <span className="font-semibold">{5 - items.length}</span> archivo(s) para el <span className="font-semibold">Paquete 5</span> por <span className="font-semibold">$9.900</span>. Archivos adicionales a <span className="font-semibold">$1.900</span> c/u.</>
+              )}
+            </div>
+          )}
+
           {items.length > 0 ? (
-            <div className="space-y-4">
-              <div className="max-h-[55vh] overflow-y-auto space-y-2">
+            <div className="flex flex-col flex-1 min-h-0 gap-3">
+              {/* Lista de items con scroll controlado */}
+              <div className="overflow-y-auto space-y-2 max-h-[25vh] flex-shrink-0">
                 {items.map((item, idx) => (
                   <div key={`${item.product_id}-${idx}`} className="flex items-center justify-between p-3 bg-slate-50 rounded-lg">
                     <div className="flex-1">
@@ -254,7 +289,7 @@ export function CartWidget() {
                       <p className="text-xs text-slate-500">{item.year_range}</p>
                     </div>
                     <div className="flex items-center space-x-2">
-                      <span className="font-semibold">{formatClp(Number(item.price || 0))}</span>
+                      <span className="font-semibold">$2.900</span>
                       <Button
                         variant="ghost"
                         size="sm"
@@ -268,22 +303,51 @@ export function CartWidget() {
                 ))}
               </div>
 
-              <Separator />
+              <Separator className="flex-shrink-0" />
 
-              <div className="space-y-2">
-                <div className="flex justify-between items-center font-semibold text-sm text-slate-800">
+              {/* Sección de totales compacta */}
+              <div className="space-y-2 flex-shrink-0">
+                {/* Mostrar precio individual vs paquete */}
+                <div className="flex justify-between items-center text-xs text-slate-600">
+                  <span>Individual ({items.length} × $2.900):</span>
+                  <span className={items.length >= 3 ? "line-through" : ""}>{formatClp(items.length * 2900)}</span>
+                </div>
+                
+                {/* Mostrar descuento aplicado */}
+                {items.length >= 3 && (
+                  <>
+                    <div className="flex justify-between items-center text-xs text-green-600">
+                      <span>
+                        {items.length >= 5 ? (
+                          items.length > 5 ? 
+                            `Paquete 5 ($9.900) + ${items.length - 5} × $1.900:` :
+                            `Descuento Paquete 5:`
+                        ) : (
+                          items.length > 3 ?
+                            `Paquete 3 ($6.900) + ${items.length - 3} × $2.200:` :
+                            `Descuento Paquete 3:`
+                        )}
+                      </span>
+                      <span>-{formatClp(totalSavings)}</span>
+                    </div>
+                  </>
+                )}
+
+                <div className="flex justify-between items-center font-semibold text-sm text-slate-800 pt-1 border-t">
                   <span>Total:</span>
-                  <span>{formatClp(totalClp)}</span>
+                  <span className="text-green-600">{formatClp(totalClp)}</span>
                 </div>
-                <div className="flex items-center justify-between text-[11px] text-slate-600">
-                  <div className="flex items-center gap-1"><ShieldCheck className="h-3.5 w-3.5 text-blue-600" /> Pago seguro Transbank</div>
-                  <div className="flex items-center gap-1"><CheckCircle className="h-3.5 w-3.5 text-emerald-600" /> Datos oficiales CMF</div>
-                  <div className="flex items-center gap-1"><Clock className="h-3.5 w-3.5 text-sky-600" /> Entrega inmediata</div>
-                </div>
+                
+                {totalSavings > 0 && (
+                  <p className="text-xs text-green-600 text-center">
+                    ¡Ahorras {formatClp(totalSavings)}!
+                  </p>
+                )}
               </div>
 
+              {/* Botón de pago */}
               <Button 
-                className="w-full bg-gray-900 hover:bg-gray-800 text-white font-light px-6 py-3 rounded-xl"
+                className="w-full bg-gray-900 hover:bg-gray-800 text-white font-medium px-4 py-2 rounded-lg flex-shrink-0"
                 onClick={handleCheckout}
                 disabled={isProcessing}
               >
@@ -295,34 +359,17 @@ export function CartWidget() {
                 Pagar con WebPay
               </Button>
 
-              <p className="text-xs text-slate-500 text-center">Compra 100% segura. Recibirás enlaces de descarga por email.</p>
+              {/* Iconos de confianza compactos */}
+              <div className="flex justify-center gap-4 text-[10px] text-slate-500 flex-shrink-0">
+                <div className="flex items-center gap-1"><ShieldCheck className="h-3 w-3" /> Seguro</div>
+                <div className="flex items-center gap-1"><CheckCircle className="h-3 w-3" /> Oficial</div>
+                <div className="flex items-center gap-1"><Clock className="h-3 w-3" /> Inmediato</div>
+              </div>
             </div>
           ) : (
             <div className="text-center py-8">
               <ShoppingCart className="h-12 w-12 text-gray-300 mx-auto mb-4" />
               <p className="text-gray-500">Agrega archivos a tu carrito para comenzar</p>
-            </div>
-          )}
-
-          {items.length > 0 && recommended.length > 0 && (
-            <div className="mt-2 border-t pt-3">
-              <p className="text-xs font-semibold mb-2 text-gray-700">También te puede interesar</p>
-              <div className="space-y-2">
-                {recommended.map((p) => (
-                  <div key={p.id} className="flex items-center justify-between p-2 rounded-md bg-gray-50">
-                    <div className="min-w-0 pr-2">
-                      <p className="text-sm font-medium truncate">{p.companyName}</p>
-                      <p className="text-[11px] text-gray-500 truncate">{p.yearRange} • {p.sector}</p>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <span className="text-sm font-semibold">{formatClp(Number(p.price || 0))}</span>
-                      <Button size="sm" className="h-7 px-3 bg-blue-600 text-white hover:bg-blue-700" onClick={() => addRecommendedToCart(p)}>
-                        Añadir
-                      </Button>
-                    </div>
-                  </div>
-                ))}
-              </div>
             </div>
           )}
         </DialogContent>

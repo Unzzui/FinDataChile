@@ -20,6 +20,7 @@ interface UploadedFile {
   productId?: string
   error?: string
   file?: File
+  rut?: string
 }
 
 export function FileUploadManager() {
@@ -29,12 +30,24 @@ export function FileUploadManager() {
   const fileInputRef = useRef<HTMLInputElement>(null)
   const { toast } = useToast()
 
+  const parseRutFromFileName = (filename: string): string | undefined => {
+    // Caso común: 7-8 dígitos, guion, DV (número o K/k)
+    let m = filename.match(/(\d{7,8})-([0-9kK])/)
+    if (m) return `${m[1]}-${m[2].toUpperCase()}`
+    // Fallback: limpiar y volver a buscar, por si hay separadores u otros símbolos
+    const cleaned = filename.replace(/[^0-9kK-]/gi, ' ')
+    m = cleaned.match(/(\d{7,8})-([0-9kK])/)
+    if (m) return `${m[1]}-${m[2].toUpperCase()}`
+    return undefined
+  }
+
   const handleFileSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(event.target.files || [])
     
     const newFiles: UploadedFile[] = files.map(file => {
       // Clasificar automáticamente cada archivo
       const empresaInfo = clasificarEmpresaDesdeArchivo(file.name)
+      const rut = parseRutFromFileName(file.name)
       
       return {
         id: Math.random().toString(36).substr(2, 9),
@@ -44,7 +57,8 @@ export function FileUploadManager() {
         progress: 0,
         empresaInfo,
         isAutoClassified: empresaInfo.confianza > 0.7, // Auto-clasificado si confianza > 70%
-        file: file // Guardar referencia al archivo real
+        file: file, // Guardar referencia al archivo real
+        rut
       }
     })
     
@@ -70,6 +84,7 @@ export function FileUploadManager() {
     const newFiles: UploadedFile[] = files.map(file => {
       // Clasificar automáticamente cada archivo
       const empresaInfo = clasificarEmpresaDesdeArchivo(file.name)
+      const rut = parseRutFromFileName(file.name)
       
       return {
         id: Math.random().toString(36).substr(2, 9),
@@ -79,7 +94,8 @@ export function FileUploadManager() {
         progress: 0,
         empresaInfo,
         isAutoClassified: empresaInfo.confianza > 0.7,
-        file: file // Guardar referencia al archivo real
+        file: file, // Guardar referencia al archivo real
+        rut
       }
     })
     
@@ -129,7 +145,8 @@ export function FileUploadManager() {
             name: file.name,
             size: file.size,
             empresaInfo: file.empresaInfo,
-            isAutoClassified: file.isAutoClassified
+            isAutoClassified: file.isAutoClassified,
+            rut: file.rut
           }))
 
           // Llamar a la API para procesar el archivo
@@ -376,6 +393,13 @@ export function FileUploadManager() {
                           {getConfidenceBadge(file.empresaInfo.confianza)}
                         </div>
                       )}
+
+                      {/* RUT detectado desde el nombre de archivo */}
+                      <div className="flex items-center gap-2 mb-2">
+                        <span className="text-xs px-2 py-1 rounded border">
+                          {file.rut ? `RUT: ${file.rut}` : 'RUT no detectado en nombre de archivo'}
+                        </span>
+                      </div>
                       
                       <div className="flex items-center gap-4 text-sm text-gray-500">
                         <span>{formatFileSize(file.size)}</span>

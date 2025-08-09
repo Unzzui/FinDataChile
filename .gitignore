@@ -25,7 +25,7 @@ public/excel-products/
 
 # Base de datos local
 # Ignora SOLO la carpeta data/ en la raíz; permite subcarpetas como lib/data/
-/data/
+/data/ 
 *.db
 *.sqlite
 

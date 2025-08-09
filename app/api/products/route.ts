@@ -1,15 +1,12 @@
-import { NextRequest, NextResponse } from 'next/server';
+import { NextResponse } from 'next/server';
 import { pgQuery } from '@/lib/pg';
+import { findCompanyDescription } from '@/lib/company-descriptions'
 
 export const revalidate = 120
 
-export async function GET(request: NextRequest) {
+export async function GET() {
   try {
-    const searchParams = request.nextUrl.searchParams;
-    const showAll = searchParams.get('showAll') === 'true';
-    
-    const query = showAll ? 'SELECT * FROM products ORDER BY company_name' : 'SELECT * FROM products WHERE is_active = true ORDER BY company_name';
-    const { rows: products } = await pgQuery(query);
+    const { rows: products } = await pgQuery('SELECT * FROM products WHERE is_active = true ORDER BY company_name');
     
     // logs reducidos en producción
     
@@ -23,7 +20,7 @@ export async function GET(request: NextRequest) {
       endYear: product.end_year,
       price: product.price,
       filePath: product.file_path,
-      description: product.description,
+      description: findCompanyDescription(product.company_name) || (product.description || '').replace(/Estados\s+financieros\s+.*?\.|Incluye\s+Balance\s+General,\s+Estado\s+de\s+Resultados\s+y\s+Flujo\s+de\s+Efectivo\./gi, '').trim(),
       isActive: product.is_active,
       isQuarterly: product.description.toLowerCase().includes('trimestral'),
       createdAt: product.created_at,

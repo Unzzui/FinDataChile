@@ -37,6 +37,11 @@ export async function PUT(request: NextRequest) {
     }
 
     // Actualizar el producto
+    // Normalizar descripción si viene vacía o con boilerplate
+    const normalizedDescription = (!description || /Estados\s+financieros\s+/i.test(description))
+      ? `${companyName}${sector ? ` (${sector})` : ''}. Estados financieros oficiales en formato Excel.`
+      : description
+
     await pgQuery(
       `UPDATE products SET 
         company_name = $1,
@@ -58,7 +63,7 @@ export async function PUT(request: NextRequest) {
         endYear,
         price,
         filePath,
-        description,
+        normalizedDescription,
         isActive,
         id
       ]

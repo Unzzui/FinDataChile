@@ -8,6 +8,14 @@ export async function POST(request: NextRequest) {
     const body = await request.json();
     const { productIds, customerEmail, customerName } = body;
 
+    console.log('Payment initiate - datos recibidos:', { 
+      productIds, 
+      customerEmail, 
+      customerName,
+      productIdsLength: productIds?.length,
+      productIdsType: typeof productIds
+    });
+
     // Preferir usuario autenticado vía cookie
     const token = request.cookies.get('userToken')?.value
     const payload = verifyUserToken(token)
@@ -21,7 +29,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Obtener productos desde la base de datos y calcular total
+    // Obtener productos desde la base de datos y calcular total con descuentos
     let total = 0;
     
     const { getProductsByIds } = await import('@/lib/database')
@@ -35,12 +43,75 @@ export async function POST(request: NextRequest) {
       )
       const purchasedSet = new Set(purchasedRows.map(r => r.product_id))
       filteredProductIds = productIds.filter(id => !purchasedSet.has(id))
+      
+      console.log('Filtrado de productos:', {
+        originalProductIds: productIds,
+        purchasedProductIds: Array.from(purchasedSet),
+        filteredProductIds,
+        effectiveEmail
+      });
     }
-    const effectivePriceRows = priceRows.filter(r => filteredProductIds.includes(r.id))
-    for (const row of effectivePriceRows) total += Number(row.price || 0)
+    const effectivePriceRows = priceRows.filter((r: any) => filteredProductIds.includes(r.id))
+    
+    // Verificar que queden productos por comprar
+    if (filteredProductIds.length === 0) {
+      return NextResponse.json(
+        { error: 'Todos los productos seleccionados ya han sido comprados' },
+        { status: 400 }
+      );
+    }
+    
+    // Aplicar descuentos por paquetes
+    const itemCount = filteredProductIds.length
+    if (itemCount >= 5) {
+      // Para 5 o más: precio base de paquete 5 + items adicionales a precio reducido
+      const extraItems = itemCount - 5
+      total = 9900 + (extraItems * 1900) // Items adicionales a $1.900 c/u
+    } else if (itemCount >= 3) {
+      // Para 3-4: precio base de paquete 3 + items adicionales a precio reducido  
+      const extraItems = itemCount - 3
+      total = 6900 + (extraItems * 2200) // Items adicionales a $2.200 c/u
+    } else {
+      total = itemCount * 2900 // Precio individual
+    }
+    
+    // Validar que el total sea válido
+    if (!total || total <= 0 || !Number.isInteger(total)) {
+      console.error('Error: total inválido calculado:', { 
+        total, 
+        itemCount, 
+        filteredProductIds,
+        originalProductIds: productIds 
+      });
+      return NextResponse.json(
+        { error: 'Error calculando el total del pago' },
+        { status: 400 }
+      );
+    }
     
     // Precios definidos en CLP en la BD. Transbank requiere CLP.
-    const amount = Math.round(total)
+    const amount = Math.floor(Math.abs(total)) // Asegurar que sea entero positivo
+    
+    // Validar que amount sea un entero positivo (requerimiento de Transbank)
+    if (!amount || amount <= 0 || amount < 50) { // Transbank requiere mínimo $50 CLP
+      console.error('Error: amount inválido para Transbank:', { 
+        amount, 
+        total, 
+        itemCount, 
+        filteredProductIds 
+      });
+      return NextResponse.json(
+        { error: 'Monto de pago inválido (mínimo $50 CLP)' },
+        { status: 400 }
+      );
+    }
+    
+    console.log('Iniciando pago:', { 
+      itemCount, 
+      total, 
+      amount,
+      productIds: filteredProductIds 
+    });
 
     // Generar identificadores únicos
     const buyOrder = generateBuyOrder();
@@ -72,13 +143,14 @@ export async function POST(request: NextRequest) {
     )
 
     // Guardar productos de la transacción para referencia en el retorno
+    // Calcular precio proporcional cuando hay descuentos
+    const proportionalPrice = Math.floor(total / filteredProductIds.length)
+    
     for (const pid of filteredProductIds) {
-      const row = effectivePriceRows.find((r: any) => r.id === pid)
-      const price = row ? Number(row.price || 0) : 0
       await pgQuery(
         `INSERT INTO transaction_products (transaction_id, product_id, price, created_at)
          VALUES ($1, $2, $3, NOW())`,
-        [buyOrder, pid, price]
+        [buyOrder, pid, proportionalPrice]
       )
     }
 
